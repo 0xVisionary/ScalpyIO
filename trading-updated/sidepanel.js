@@ -173,7 +173,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function addMessage(text, sender) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${sender}`;
-        messageDiv.textContent = text;
+        
+        if (sender === 'bot') {
+            // Format the analysis if it's from the bot
+            messageDiv.innerHTML = formatAnalysis(text);
+        } else {
+            messageDiv.textContent = text;
+        }
+        
         messagesContainer.appendChild(messageDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
@@ -284,4 +291,81 @@ function toggleTheme() {
 }
 
 // Add this to check if the panel is loaded
-console.log('Sidepanel script loaded'); 
+console.log('Sidepanel script loaded');
+
+function formatAnalysis(rawText) {
+    // Remove extra #s and clean up the text
+    let formattedText = rawText
+        // Replace markdown headers with HTML headers
+        .replace(/#{1,6}\s?(.*?)(?=\n|$)/g, (match, content) => {
+            const level = (match.match(/#/g) || []).length;
+            return `<h${level}>${content.trim()}</h${level}>`;
+        })
+        // Replace bold text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        // Replace bullet points
+        .replace(/- (.*?)(?=\n|$)/g, '<li>$1</li>')
+        // Wrap bullet points in ul
+        .replace(/(<li>.*?<\/li>\n?)+/g, '<ul>$&</ul>')
+        // Add paragraph tags for regular text
+        .replace(/(?<=\n|^)(?![<\s])(.*?)(?=\n|$)/g, '<p>$1</p>')
+        // Clean up empty paragraphs
+        .replace(/<p>\s*<\/p>/g, '')
+        // Add spacing between sections
+        .replace(/<\/h(\d)>/g, '</h$1><br>');
+
+    return `<div class="analysis-container">${formattedText}</div>`;
+}
+
+// Add these styles to your CSS
+const analysisCss = `
+.analysis-container {
+    padding: 1rem;
+    color: var(--text);
+}
+
+.analysis-container h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 1.5rem 0 1rem 0;
+    color: var(--text);
+}
+
+.analysis-container h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 1.25rem 0 1rem 0;
+    color: var(--text-muted);
+}
+
+.analysis-container h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 1rem 0 0.75rem 0;
+}
+
+.analysis-container p {
+    margin: 0.75rem 0;
+    line-height: 1.6;
+}
+
+.analysis-container strong {
+    color: var(--text);
+    font-weight: 600;
+}
+
+.analysis-container ul {
+    margin: 0.75rem 0;
+    padding-left: 1.5rem;
+}
+
+.analysis-container li {
+    margin: 0.5rem 0;
+    line-height: 1.6;
+}
+
+.analysis-container br {
+    display: block;
+    content: "";
+    margin: 0.5rem 0;
+}`;
