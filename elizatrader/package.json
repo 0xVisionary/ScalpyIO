@@ -1,0 +1,34 @@
+{
+  "name": "elizatrader",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "description": "",
+  "dependencies": {
+    "@elizaos/client-direct": "0.1.7",
+    "@elizaos/adapter-sqlite": "0.1.7",
+    "@elizaos/core": "0.1.7",
+    "@elizaos/plugin-birdeye": "file:plugin-birdeye",
+    "@elizaos/plugin-solana": "0.1.7",
+    "@tavily/core": "^0.0.2",
+    "agent-twitter-client": "^0.0.18",
+    "amqplib": "^0.10.5",
+    "bn.js": "^5.2.1",
+    "sharp": "^0.33.5"
+  },
+  "supportedArchitectures": {
+    "os": [
+      "darwin",
+      "current"
+    ],
+    "cpu": [
+      "arm64"
+    ]
+  }
+}
