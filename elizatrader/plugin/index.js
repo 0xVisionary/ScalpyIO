@@ -3,7 +3,7 @@ import {
   Service,
   elizaLogger,
   generateObjectDeprecated,
-  ModelClass
+  ModelClass,
 } from "@elizaos/core";
 import { Scraper, SearchMode } from "agent-twitter-client";
 var BirdeyeService = class extends Service {
@@ -35,7 +35,7 @@ var BirdeyeService = class extends Service {
     try {
       const prompt = `You are a cryptocurrency token identifier. Extract the token symbol or address from this message. 
 If you find a token symbol (usually prefixed with $) or a Solana address, return it in JSON format.
-Only extract ONE token, preferably the first one mentioned.
+Only extract ONE token, preferably the first one mentioned. Make sure you output this in markdown as you would show it in a chat.
 
 Message: "${text}"
 
@@ -54,7 +54,7 @@ Rules:
       const result = await generateObjectDeprecated({
         context: prompt,
         modelClass: ModelClass.LARGE,
-        runtime: this.runtime
+        runtime: this.runtime,
       });
       try {
         const parsed = result;
@@ -88,8 +88,8 @@ Rules:
       headers: {
         "X-API-KEY": this.apiKey,
         Accept: "application/json",
-        "x-chain": "solana"
-      }
+        "x-chain": "solana",
+      },
     });
     if (!response.ok) {
       throw new Error(`API request failed: ${response.statusText}`);
@@ -110,58 +110,113 @@ Rules:
       const recentTweets = tweets.slice(0, 5);
       twitterAnalysis = `
 Recent Twitter Activity:
-${recentTweets.map((tweet, index) => {
-        const tweetDetails = {
-          number: index + 1,
-          url: tweet.permanentUrl,
-          author: `@${tweet.username}`,
-          engagement: `${tweet.likes} likes, ${tweet.retweets} retweets, ${tweet.replies} replies`,
-          views: tweet.views,
-          content: tweet.text.length > 200 ? `${tweet.text.substring(0, 200)}...` : tweet.text
-        };
-        return `
+${recentTweets
+  .map((tweet, index) => {
+    const tweetDetails = {
+      number: index + 1,
+      url: tweet.permanentUrl,
+      author: `@${tweet.username}`,
+      engagement: `${tweet.likes} likes, ${tweet.retweets} retweets, ${tweet.replies} replies`,
+      views: tweet.views,
+      content:
+        tweet.text.length > 200
+          ? `${tweet.text.substring(0, 200)}...`
+          : tweet.text,
+    };
+    return `
 Tweet ${tweetDetails.number} (${tweetDetails.url}):
 - Author: ${tweetDetails.author}
 - Engagement: ${tweetDetails.engagement}
 - Views: ${tweetDetails.views}
 - Content: ${tweetDetails.content}
 `;
-      }).join("\n")}`;
+  })
+  .join("\n")}`;
     }
     console.log("Twitter analysis:", twitterAnalysis);
-    return `You are a cryptocurrency expert analyst. Evaluate trustworthiness based on:
-- Token Name: ${metrics.name} (${metrics.symbol})
-- Current Price: $${metrics.price.toFixed(4)}
-- 24h Price Change: ${metrics.priceChange24hPercent.toFixed(2)}%
-- Market Cap: $${metrics.mc.toLocaleString()} USD
-- Liquidity: $${metrics.liquidity.toLocaleString()} USD
-- Number of Holders: ${metrics.holder.toLocaleString()}
-- 24h Trading Volume: ${metrics.volume24h ? `$${metrics.volume24h.toLocaleString()} USD` : "N/A"}
-- 24h Number of Trades: ${metrics.trade24h.toLocaleString()}
-- Available Markets: ${metrics.numberMarkets}
-${metrics.extensions?.description ? `
-Project Description: ${metrics.extensions.description}` : ""}
-${metrics.extensions?.website ? `
-Website: ${metrics.extensions.website}` : ""}
-${metrics.extensions?.twitter ? `
-Twitter: ${metrics.extensions.twitter}` : ""}
-${metrics.extensions?.telegram ? `
-Telegram: ${metrics.extensions.telegram}` : ""}
-Here is the recent twitter activity related to this token:
-${twitterAnalysis}
+    return `You are a cryptocurrency expert analyst. Evaluate trustworthiness based on these metrics. Format your response in markdown exactly as shown:
 
-Based on these metrics and social media activity, provide:
-1. Trust Score (1-10)
-2. Brief analysis of the token's:
-   - Market health (liquidity, trading volume, price action)
-   - Community engagement (holders, social presence, Twitter activity)
-   - Overall risk assessment
-3. Key recommendations for potential investors
-4. Social Media Analysis:
-   - Twitter sentiment and engagement levels (cite specific tweets by their number when relevant)
-   - Quality of discussions and community interaction
-   - Red flags or positive indicators from social activity
-   - Credibility of the accounts discussing the token`;
+**${metrics.name} (${metrics.symbol})**
+- Price: $${metrics.price.toFixed(4)}
+- 24h Change: ${metrics.priceChange24hPercent.toFixed(2)}%
+- Market Cap: $${metrics.mc.toLocaleString()}
+- Liquidity: $${metrics.liquidity.toLocaleString()}
+- Holders: ${metrics.holder.toLocaleString()}
+- 24h Volume: ${
+      metrics.volume24h ? `$${metrics.volume24h.toLocaleString()}` : "N/A"
+    }
+- 24h Trades: ${metrics.trade24h.toLocaleString()}
+- Markets: ${metrics.numberMarkets}${
+      metrics.extensions?.description
+        ? `\nDescription: ${metrics.extensions.description}`
+        : ""
+    }${
+      metrics.extensions?.website
+        ? `\nWebsite: ${metrics.extensions.website}`
+        : ""
+    }${
+      metrics.extensions?.twitter
+        ? `\nTwitter: ${metrics.extensions.twitter}`
+        : ""
+    }${
+      metrics.extensions?.telegram
+        ? `\nTelegram: ${metrics.extensions.telegram}`
+        : ""
+    }
+
+Recent Twitter Activity:${
+      tweets && tweets.length > 0
+        ? tweets
+            .slice(0, 5)
+            .map((tweet, index) => {
+              const tweetDetails = {
+                number: index + 1,
+                url: tweet.permanentUrl,
+                author: `@${tweet.username}`,
+                engagement: `${tweet.likes} likes, ${tweet.retweets} RTs, ${tweet.replies} replies`,
+                views: tweet.views,
+                content:
+                  tweet.text.length > 200
+                    ? `${tweet.text.substring(0, 200)}...`
+                    : tweet.text,
+              };
+              return `\n${tweetDetails.number}. ${tweetDetails.author}: ${tweetDetails.content}\n   ${tweetDetails.engagement} | ${tweetDetails.views} views`;
+            })
+            .join("\n")
+        : "\nNo recent tweets found."
+    }
+
+### Trust Score:2/10
+
+Market Health
+- \`Liquidity and Trading Metrics\`: The liquidity metrics and trading volume analysis
+- \`Price Action and Volatility\`: Analysis of price movements and stability
+- \`Market Cap Implications\`: What the market cap suggests about the token
+
+Community Engagement
+- \`Holder Analysis\`: Assessment of holder distribution and behavior
+- \`Social Media Presence\`: Evaluation of social media activity and reach
+- \`Community Activity\`: Analysis of community engagement and growth
+
+Risk Assessment
+- \`Key Risks\`: Major risk factors identified
+- \`Warning Signs\`: Potential red flags to consider
+- \`Stability Factors\`: Elements contributing to stability
+
+Key Recommendations
+- \`Main Points\`: Key points for investors to consider
+- \`Risk Mitigation\`: Suggested risk mitigation strategies
+- \`Action Items\`: Recommended next steps
+
+Social Media Analysis
+- \`Twitter Engagement\`: Analysis of Twitter metrics and reach
+- \`Discussion Quality\`: Assessment of community discussions
+- \`Community Credibility\`: Evaluation of community trustworthiness
+
+Risk Indicators
+- \`Red Flags\`: Identified warning signs
+- \`Positive Signs\`: Notable positive indicators
+- \`Notable Patterns\`: Observed trading and community patterns`;
   }
   /**
    * Search for tokens by symbol or name
@@ -176,8 +231,8 @@ Based on these metrics and social media activity, provide:
     const response = await fetch(endpoint, {
       headers: {
         "X-API-KEY": this.apiKey,
-        Accept: "application/json"
-      }
+        Accept: "application/json",
+      },
     });
     if (!response.ok) {
       throw new Error(`Search API request failed: ${response.statusText}`);
@@ -203,7 +258,7 @@ var TwitterScrapperService = class extends Service {
       );
     } catch (error) {
       elizaLogger.error("TWITTER_SCRAPPER", "Error getting cached cookies", {
-        error
+        error,
       });
       return null;
     }
@@ -221,7 +276,12 @@ var TwitterScrapperService = class extends Service {
   }
   async setCookiesFromArray(scraper, cookiesArray) {
     const cookieStrings = cookiesArray.map(
-      (cookie) => `${cookie.key}=${cookie.value}; Domain=${cookie.domain}; Path=${cookie.path}; ${cookie.secure ? "Secure" : ""}; ${cookie.httpOnly ? "HttpOnly" : ""}; SameSite=${cookie.sameSite || "Lax"}`
+      (cookie) =>
+        `${cookie.key}=${cookie.value}; Domain=${cookie.domain}; Path=${
+          cookie.path
+        }; ${cookie.secure ? "Secure" : ""}; ${
+          cookie.httpOnly ? "HttpOnly" : ""
+        }; SameSite=${cookie.sameSite || "Lax"}`
     );
     await scraper.setCookies(cookieStrings);
   }
@@ -304,7 +364,7 @@ var TwitterScrapperService = class extends Service {
 import {
   ModelClass as ModelClass2,
   elizaLogger as elizaLogger2,
-  generateText
+  generateText,
 } from "@elizaos/core";
 var scanCoinAction = {
   name: "SCAN_COIN",
@@ -335,9 +395,10 @@ var scanCoinAction = {
     "COIN_INFORMATION",
     "CHECK_ADDRESS",
     "ANALYZE_THIS_ADDRESS",
-    "WHAT_IS_THIS_ADDRESS"
+    "WHAT_IS_THIS_ADDRESS",
   ],
-  description: "Analyzes and provides information about Solana coins/tokens including trust scores, safety metrics, and market analysis. This action triggers when users ask about specific tokens using $ symbol (like $JUP, $WIF) or when they provide a Solana token address (like 'So11111111111111111111111111111111111111112'). It handles natural queries like 'What can you tell me about $TOKEN?', 'Is this coin safe?', or 'Can you check this address: So1...'",
+  description:
+    "Analyzes and provides information about Solana coins/tokens including trust scores, safety metrics, and market analysis. This action triggers when users ask about specific tokens using $ symbol (like $JUP, $WIF) or when they provide a Solana token address (like 'So11111111111111111111111111111111111111112'). It handles natural queries like 'What can you tell me about $TOKEN?', 'Is this coin safe?', or 'Can you check this address: So1...'",
   validate: async (runtime, message) => {
     return true;
   },
@@ -353,7 +414,7 @@ var scanCoinAction = {
       elizaLogger2.info(`Identifier: ${identifier}`);
       if (!identifier) {
         callback({
-          text: "No valid coin symbol/address found. Please use format like $JUP or provide a Solana address."
+          text: "No valid coin symbol/address found. Please use format like $JUP or provide a Solana address.",
         });
         return false;
       }
@@ -363,26 +424,24 @@ var scanCoinAction = {
       elizaLogger2.info(`Fetched ${tweets.length} tweets`);
       const llmPrompt = birdeye.createTrustScorePrompt(metrics, tweets);
       elizaLogger2.info(`LLM Prompt: ${llmPrompt}`);
-      elizaLogger2.info(
-        "Generating analysis..."
-      );
+      elizaLogger2.info("Generating analysis...");
       const analysis = await generateText({
         context: llmPrompt,
         modelClass: ModelClass2.LARGE,
-        runtime
+        runtime,
       });
       elizaLogger2.info(`Analysis: ${analysis}`);
       if (analysis && callback) {
         await callback({
           text: `**${metrics.symbol} Analysis**  
-                ${analysis}`
+                ${analysis}`,
         });
       }
       return true;
     } catch (error) {
       console.error("Coin scan failed:", error);
       callback({
-        text: "Sorry, I couldn't retrieve the coin data at this time. Please try again later."
+        text: "Sorry, I couldn't retrieve the coin data at this time. Please try again later.",
       });
       return false;
     }
@@ -392,92 +451,88 @@ var scanCoinAction = {
     [
       {
         user: "{{user1}}",
-        content: { text: "Can you scan $JUP and tell me if it's safe?" }
+        content: { text: "Can you scan $JUP and tell me if it's safe?" },
       },
       {
         user: "{{user2}}",
         content: {
           text: "I'll analyze Jupiter ($JUP) for you...",
-          action: "SCAN_COIN"
-        }
-      }
+          action: "SCAN_COIN",
+        },
+      },
     ],
     // Example 2: Address scan
     [
       {
         user: "{{user1}}",
-        content: { text: "What's the trust score for this address: So1ara..." }
+        content: { text: "What's the trust score for this address: So1ara..." },
       },
       {
         user: "{{user2}}",
         content: {
           text: "I'll check that Solana address for you...",
-          action: "SCAN_COIN"
-        }
-      }
+          action: "SCAN_COIN",
+        },
+      },
     ],
     // Example 3: Multiple tokens comparison
     [
       {
         user: "{{user1}}",
-        content: { text: "Compare the safety of $BONK and $WIF please" }
+        content: { text: "Compare the safety of $BONK and $WIF please" },
       },
       {
         user: "{{user2}}",
         content: {
           text: "I'll analyze both BONK and WIF tokens for comparison...",
-          action: "SCAN_COIN"
-        }
-      }
+          action: "SCAN_COIN",
+        },
+      },
     ],
     // Example 4: Detailed analysis request
     [
       {
         user: "{{user1}}",
         content: {
-          text: "Give me a full analysis of $ORCA including liquidity and trading volume"
-        }
+          text: "Give me a full analysis of $ORCA including liquidity and trading volume",
+        },
       },
       {
         user: "{{user2}}",
         content: {
           text: "I'll perform a comprehensive analysis of ORCA token...",
-          action: "SCAN_COIN"
-        }
-      }
+          action: "SCAN_COIN",
+        },
+      },
     ],
     // Example 5: Quick safety check
     [
       {
         user: "{{user1}}",
-        content: { text: "Is this token safe? $PYTH" }
+        content: { text: "Is this token safe? $PYTH" },
       },
       {
         user: "{{user2}}",
         content: {
           text: "Let me check the safety metrics for PYTH...",
-          action: "SCAN_COIN"
-        }
-      }
-    ]
-  ]
+          action: "SCAN_COIN",
+        },
+      },
+    ],
+  ],
 };
 var actions_default = scanCoinAction;
 
 // src/plugin/src/index.ts
 var tradingBuddyPlugin = {
   name: "tradingBuddyPlugin",
-  description: "Agent that helps with trading and investing in crypto on the Solana blockchain, get info about coins, addresses, and more",
-  actions: [
-    actions_default
-  ],
+  description:
+    "Agent that helps with trading and investing in crypto on the Solana blockchain, get info about coins, addresses, and more",
+  actions: [actions_default],
   evaluators: [],
   providers: [],
-  services: [new BirdeyeService(), new TwitterScrapperService()]
+  services: [new BirdeyeService(), new TwitterScrapperService()],
 };
 var index_default = tradingBuddyPlugin;
-export {
-  index_default as default,
-  tradingBuddyPlugin
-};
+export { index_default as default, tradingBuddyPlugin };
 //# sourceMappingURL=index.js.map
