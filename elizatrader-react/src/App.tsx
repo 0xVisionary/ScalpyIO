@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Message } from './types'
 import ChatSection from './components/ChatSection'
-import { initializeAgent } from './services/api'
+import { initializeAgent, sendMessage } from './services/api'
 import './App.css'
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [tokenAddress, setTokenAddress] = useState<string>('')
   const [showCopySuccess, setShowCopySuccess] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
 
   const handleCopy = async () => {
     if (tokenAddress) {
@@ -16,6 +17,37 @@ function App() {
       setTimeout(() => setShowCopySuccess(false), 2000);
     }
   };
+
+  // Trigger scan whenever tokenAddress changes
+  useEffect(() => {
+    if (tokenAddress && !isScanning) {
+      console.log('New address detected, starting scan:', tokenAddress);
+      setIsScanning(true);
+      
+      const scanCommand = `Scan: ${tokenAddress}`;
+      sendMessage(scanCommand)
+        .then(response => {
+          setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            text: scanCommand,
+            type: 'user',
+            timestamp: new Date()
+          }, response]);
+        })
+        .catch(error => {
+          console.error('Failed to send scan command:', error);
+          setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            text: 'Sorry, I encountered an error while scanning. Please try again.',
+            type: 'bot',
+            timestamp: new Date()
+          }]);
+        })
+        .finally(() => {
+          setIsScanning(false);
+        });
+    }
+  }, [tokenAddress]);
 
   const checkCurrentTab = () => {
     console.log('Checking current tab...');
@@ -27,13 +59,11 @@ function App() {
           await chrome.tabs.sendMessage(tabs[0].id, { type: "REQUEST_ADDRESS" });
         } catch (error) {
           console.log('Error sending message, attempting to inject content script:', error);
-          // Try to inject the content script
           try {
             await chrome.scripting.executeScript({
               target: { tabId: tabs[0].id },
               files: ['contentScript.js']
             });
-            // Try sending the message again after injection
             await chrome.tabs.sendMessage(tabs[0].id, { type: "REQUEST_ADDRESS" });
           } catch (injectionError) {
             console.error('Failed to inject content script:', injectionError);
@@ -44,9 +74,9 @@ function App() {
   };
 
   useEffect(() => {
-    // Initialize agent when app starts
     const init = async () => {
       try {
+        // Initialize agent first
         const success = await initializeAgent();
         if (success) {
           setMessages([{
@@ -55,6 +85,10 @@ function App() {
             type: 'bot',
             timestamp: new Date()
           }]);
+          
+          // After successful initialization, check for current address
+          console.log('Checking for current address...');
+          checkCurrentTab();
         } else {
           setMessages([{
             id: Date.now().toString(),
@@ -70,25 +104,25 @@ function App() {
 
     init();
 
-    // Connect to the background script
     const port = chrome.runtime.connect({ name: "sidepanel" });
     
-    // Listen for messages from the background script
     const messageListener = (message: any) => {
       console.log('Received message:', message);
       if (message.type === "ADDRESS_UPDATE") {
-        console.log('Setting new address:', message.data.address);
-        setTokenAddress(message.data.address);
+        const newAddress = message.data.address;
+        console.log('Setting new address:', newAddress);
+        // Only update if the address is different to prevent unnecessary rescans
+        if (newAddress !== tokenAddress) {
+          setTokenAddress(newAddress);
+        }
       }
     };
 
-    // Listen for tab changes
     const tabChangeListener = (_activeInfo: chrome.tabs.TabActiveInfo) => {
       console.log('Tab changed, activeInfo:', _activeInfo);
       checkCurrentTab();
     };
 
-    // Listen for tab updates
     const tabUpdateListener = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
       console.log('Tab updated:', { tabId, changeInfo, tab });
       if (changeInfo.status === 'complete' && tab.active) {
@@ -101,11 +135,6 @@ function App() {
     chrome.tabs.onActivated.addListener(tabChangeListener);
     chrome.tabs.onUpdated.addListener(tabUpdateListener);
 
-    // Check current tab immediately
-    console.log('Initial tab check...');
-    checkCurrentTab();
-
-    // Cleanup
     return () => {
       console.log('Cleaning up event listeners...');
       chrome.runtime.onMessage.removeListener(messageListener);
@@ -113,7 +142,7 @@ function App() {
       chrome.tabs.onUpdated.removeListener(tabUpdateListener);
       port.disconnect();
     };
-  }, []);
+  }, [tokenAddress]); // Add tokenAddress to dependencies to access its current value
 
   return (
     <div className="flex flex-col min-h-0 bg-[#1a1f2e] text-gray-200 h-full w-full p-0">
@@ -147,7 +176,11 @@ function App() {
       </header>
       
       <div className="flex-1 overflow-y-auto overflow-x-hidden flex-grow">
-        <ChatSection messages={messages} setMessages={setMessages} />
+        <ChatSection 
+          messages={messages} 
+          setMessages={setMessages} 
+          isScanning={isScanning}
+        />
       </div>
     </div>
   )

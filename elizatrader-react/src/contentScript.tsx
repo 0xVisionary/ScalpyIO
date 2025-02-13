@@ -31,52 +31,56 @@ const isPhotonSite = () => {
   return window.location.hostname.includes('photon-sol.tinyastro.io');
 };
 
-// Main function to find address
-const findAddress = (): string | null => {
+// Keep track of current address
+let currentAddress: string | null = null;
+
+// Main function to find and send address
+const findAndSendAddress = (): void => {
   if (isPhotonSite()) {
     console.log('On Photon site, looking for token address in UI...');
-    return getPhotonTokenAddress();
+    const address = getPhotonTokenAddress();
+    
+    // Send if address is found and it's different from current
+    if (address && address !== currentAddress) {
+      console.log('Found new address, sending:', address);
+      chrome.runtime.sendMessage({
+        type: "ADDRESS_UPDATE",
+        data: { address }
+      });
+      currentAddress = address;
+    } else if (address && currentAddress === address) {
+      // If we have an address and it's requested again, resend it
+      console.log('Resending current address:', address);
+      chrome.runtime.sendMessage({
+        type: "ADDRESS_UPDATE",
+        data: { address }
+      });
+    }
   }
-
-  // Fallback to URL check for other sites
-  const address = findSolanaAddress(window.location.href);
-  return address;
 };
 
 // Listen for messages from the extension
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === "REQUEST_ADDRESS") {
     console.log('Received address request');
-    const address = findAddress();
-    console.log('Found address:', address);
-    if (address) {
-      chrome.runtime.sendMessage({
-        type: "ADDRESS_UPDATE",
-        data: { address }
-      });
-    }
+    findAndSendAddress();
   }
 });
 
-// Initial check
-const address = findAddress();
-if (address) {
-  chrome.runtime.sendMessage({
-    type: "ADDRESS_UPDATE",
-    data: { address }
-  });
-}
-
 // Watch for DOM changes on Photon site
 if (isPhotonSite()) {
+  let debounceTimeout: NodeJS.Timeout | null = null;
+  
   const observer = new MutationObserver(() => {
-    const address = findAddress();
-    if (address) {
-      chrome.runtime.sendMessage({
-        type: "ADDRESS_UPDATE",
-        data: { address }
-      });
+    // Clear existing timeout
+    if (debounceTimeout) {
+      clearTimeout(debounceTimeout);
     }
+    
+    // Set new timeout
+    debounceTimeout = setTimeout(() => {
+      findAndSendAddress();
+    }, 1000); // Wait 1 second after changes stop before checking
   });
 
   observer.observe(document.body, {

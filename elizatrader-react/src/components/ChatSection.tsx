@@ -6,9 +6,10 @@ import { sendMessage } from '../services/api';
 interface ChatSectionProps {
   messages: Message[];
   setMessages: Dispatch<SetStateAction<Message[]>>;
+  isScanning?: boolean;
 }
 
-const ChatSection = ({ messages, setMessages }: ChatSectionProps) => {
+const ChatSection = ({ messages, setMessages, isScanning = false }: ChatSectionProps) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isMultiline, setIsMultiline] = useState(false);
@@ -30,7 +31,7 @@ const ChatSection = ({ messages, setMessages }: ChatSectionProps) => {
       textarea.style.height = 'auto';
       const newHeight = Math.min(textarea.scrollHeight, 200);
       textarea.style.height = newHeight + 'px';
-      setIsMultiline(newHeight > 38); // 38px is our minHeight
+      setIsMultiline(newHeight > 38);
     }
   };
 
@@ -107,24 +108,26 @@ const ChatSection = ({ messages, setMessages }: ChatSectionProps) => {
                     U
                   </div>
                 )}
-                <div 
-                  className={`text-sm break-words whitespace-pre-wrap text-left min-w-0 inline-block max-w-[85%] ${
-                    message.type === 'user' 
-                      ? 'bg-blue-500 text-white rounded-2xl rounded-tl-sm py-2 px-3' 
-                      : 'bg-[#242b3d] text-gray-200 rounded-2xl rounded-tl-sm py-2 px-3 prose prose-invert prose-sm max-w-none prose-headings:mt-4 prose-headings:mb-2 prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-blue-400'
-                  }`}
-                  style={{ wordBreak: 'break-word' }}
-                >
-                  {message.type === 'bot' ? (
-                    <ReactMarkdown className="[&>*:first-child]:mt-0 [&>*:last-child]:mb-0">{message.text}</ReactMarkdown>
-                  ) : (
-                    message.text
-                  )}
+                <div className="flex flex-col gap-2 min-w-0 max-w-[85%]">
+                  <div 
+                    className={`text-sm break-words whitespace-pre-wrap text-left inline-block ${
+                      message.type === 'user' 
+                        ? 'bg-blue-500 text-white rounded-2xl rounded-tl-sm py-2 px-3' 
+                        : 'bg-[#242b3d] text-gray-200 rounded-2xl rounded-tl-sm py-2 px-3 prose prose-invert prose-sm max-w-none prose-headings:mt-4 prose-headings:mb-2 prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-blue-400'
+                    }`}
+                    style={{ wordBreak: 'break-word' }}
+                  >
+                    {message.type === 'bot' ? (
+                      <ReactMarkdown className="[&>*:first-child]:mt-0 [&>*:last-child]:mb-0">{message.text}</ReactMarkdown>
+                    ) : (
+                      message.text
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           ))}
-          {isLoading && (
+          {(isLoading || isScanning) && (
             <div className="py-2 bg-[#1a1f2e] -mx-4 px-4">
               <div className="flex items-start">
                 <div className="w-7 h-7 shrink-0 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs mr-3">
@@ -155,13 +158,13 @@ const ChatSection = ({ messages, setMessages }: ChatSectionProps) => {
               onChange={handleInput}
               onKeyDown={handleKeyDown}
               placeholder="Type your message..."
-              disabled={isLoading}
-              className="w-full bg-[#242b3d] border border-[#2d3548] rounded-lg px-3 py-2 pr-10 text-sm text-gray-200 outline-none focus:border-blue-500 transition-colors shadow-[0_2px_8px_rgba(0,0,0,0.2)] resize-none overflow-y-auto max-h-[200px]"
+              disabled={isLoading || isScanning}
+              className="w-full bg-[#242b3d] border border-[#2d3548] rounded-lg px-3 py-2 pr-10 text-sm text-gray-200 outline-none focus:border-blue-500 transition-colors shadow-[0_2px_8px_rgba(0,0,0,0.2)] resize-none overflow-y-auto max-h-[200px] disabled:opacity-50"
               style={{ minHeight: '38px' }}
             />
             <button
               type="submit"
-              disabled={isLoading || !input.trim()}
+              disabled={isLoading || isScanning || !input.trim()}
               className="flex-none ml-2 h-[38px] w-[38px] bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors flex items-center justify-center"
             >
               <svg 
