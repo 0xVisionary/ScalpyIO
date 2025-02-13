@@ -3,27 +3,43 @@
   "name": "Trading Assistant",
   "version": "1.0.0",
   "description": "AI-powered trading assistant for cryptocurrency analysis",
-  "permissions": ["storage", "activeTab", "scripting", "sidePanel"],
-  "action": {
-    "default_title": "Trading Assistant"
-  },
-  "side_panel": {
-    "default_path": "index.html"
-  },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["contentScript.js"]
-    }
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs",
+    "storage",
+    "sidePanel"
   ],
-  "background": {
-    "service_worker": "background.js",
-    "type": "module"
+  "host_permissions": [
+    "*://*.photon-sol.tinyastro.io/*"
+  ],
+  "action": {
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "32": "assets/icon32.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    }
   },
   "icons": {
     "16": "assets/icon16.png",
     "32": "assets/icon32.png",
     "48": "assets/icon48.png",
     "128": "assets/icon128.png"
-  }
+  },
+  "side_panel": {
+    "default_path": "index.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.photon-sol.tinyastro.io/*"
+      ],
+      "js": ["contentScript.js"]
+    }
+  ]
 } 

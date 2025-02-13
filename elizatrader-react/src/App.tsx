@@ -17,6 +17,32 @@ function App() {
     }
   };
 
+  const checkCurrentTab = () => {
+    console.log('Checking current tab...');
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      console.log('Current tab:', tabs[0]);
+      if (tabs[0]?.id && !tabs[0].url?.startsWith('chrome://')) {
+        try {
+          console.log('Sending REQUEST_ADDRESS to tab:', tabs[0].id);
+          await chrome.tabs.sendMessage(tabs[0].id, { type: "REQUEST_ADDRESS" });
+        } catch (error) {
+          console.log('Error sending message, attempting to inject content script:', error);
+          // Try to inject the content script
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId: tabs[0].id },
+              files: ['contentScript.js']
+            });
+            // Try sending the message again after injection
+            await chrome.tabs.sendMessage(tabs[0].id, { type: "REQUEST_ADDRESS" });
+          } catch (injectionError) {
+            console.error('Failed to inject content script:', injectionError);
+          }
+        }
+      }
+    });
+  };
+
   useEffect(() => {
     // Initialize agent when app starts
     const init = async () => {
@@ -49,29 +75,42 @@ function App() {
     
     // Listen for messages from the background script
     const messageListener = (message: any) => {
+      console.log('Received message:', message);
       if (message.type === "ADDRESS_UPDATE") {
+        console.log('Setting new address:', message.data.address);
         setTokenAddress(message.data.address);
       }
     };
 
-    chrome.runtime.onMessage.addListener(messageListener);
-
-    // Check current tab immediately and periodically
-    const checkCurrentTab = () => {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-          chrome.tabs.sendMessage(tabs[0].id!, { type: "REQUEST_ADDRESS" });
-        }
-      });
+    // Listen for tab changes
+    const tabChangeListener = (_activeInfo: chrome.tabs.TabActiveInfo) => {
+      console.log('Tab changed, activeInfo:', _activeInfo);
+      checkCurrentTab();
     };
 
+    // Listen for tab updates
+    const tabUpdateListener = (tabId: number, changeInfo: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) => {
+      console.log('Tab updated:', { tabId, changeInfo, tab });
+      if (changeInfo.status === 'complete' && tab.active) {
+        checkCurrentTab();
+      }
+    };
+
+    console.log('Setting up event listeners...');
+    chrome.runtime.onMessage.addListener(messageListener);
+    chrome.tabs.onActivated.addListener(tabChangeListener);
+    chrome.tabs.onUpdated.addListener(tabUpdateListener);
+
+    // Check current tab immediately
+    console.log('Initial tab check...');
     checkCurrentTab();
-    const interval = setInterval(checkCurrentTab, 2000);
 
     // Cleanup
     return () => {
+      console.log('Cleaning up event listeners...');
       chrome.runtime.onMessage.removeListener(messageListener);
-      clearInterval(interval);
+      chrome.tabs.onActivated.removeListener(tabChangeListener);
+      chrome.tabs.onUpdated.removeListener(tabUpdateListener);
       port.disconnect();
     };
   }, []);
