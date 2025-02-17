@@ -134,10 +134,12 @@ Tweet ${tweetDetails.number} (${tweetDetails.url}):
   })
   .join("\n")}`;
     }
-    console.log("Twitter analysis:", twitterAnalysis);
-    return `You are a cryptocurrency expert analyst. Evaluate trustworthiness based on these metrics. Format your response in markdown exactly as shown:
 
-**${metrics.name} (${metrics.symbol})**
+    return `You are a cryptocurrency expert analyst. Analyze the provided metrics and return a structured analysis in the exact JSON format shown below. Include detailed explanations and insights for each section.
+
+Token Metrics:
+- Name: ${metrics.name}
+- Symbol: ${metrics.symbol}
 - Price: $${metrics.price.toFixed(4)}
 - 24h Change: ${metrics.priceChange24hPercent.toFixed(2)}%
 - Market Cap: $${metrics.mc.toLocaleString()}
@@ -147,77 +149,133 @@ Tweet ${tweetDetails.number} (${tweetDetails.url}):
       metrics.volume24h ? `$${metrics.volume24h.toLocaleString()}` : "N/A"
     }
 - 24h Trades: ${metrics.trade24h.toLocaleString()}
-- Markets: ${metrics.numberMarkets}${
-      metrics.extensions?.description
-        ? `\nDescription: ${metrics.extensions.description}`
-        : ""
-    }${
+- Markets: ${metrics.numberMarkets}
+${
+  metrics.extensions?.description
+    ? `\nDescription: ${metrics.extensions.description}`
+    : ""
+}
+
+Social Links:
+${metrics.extensions?.website ? `- Website: ${metrics.extensions.website}` : ""}
+${metrics.extensions?.twitter ? `- Twitter: ${metrics.extensions.twitter}` : ""}
+${
+  metrics.extensions?.telegram
+    ? `- Telegram: ${metrics.extensions.telegram}`
+    : ""
+}
+
+${twitterAnalysis}
+
+Return your analysis in this exact JSON format. IMPORTANT: Your response must be valid JSON that can be parsed. Do not include any explanatory text outside the JSON structure. Replace all placeholder values (text between < >) with actual values:
+
+{
+  "symbol": "${metrics.symbol}",
+  "trustScore": 7,  // Example: replace with actual number between 1-10
+  "riskLevel": "MODERATE",  // Example: replace with actual value "LOW", "MODERATE", or "HIGH"
+  "marketMetrics": {
+    "price": ${metrics.price},
+    "priceChange24h": ${metrics.priceChange24hPercent},
+    "volume24h": ${metrics.volume24h || 0},
+    "volumeChange24h": 0,
+    "liquidity": ${metrics.liquidity},
+    "marketCap": ${metrics.mc}
+  },
+  "socialMetrics": {
+    "holders": ${metrics.holder},
+    "activeHolders": 1000,  // Example: replace with actual number
+    "tweetVolume": "moderate",  // Example: replace with actual string
+    "sentiment": 0.7,  // Example: replace with actual number between 0-1
+    "communityHealth": "MODERATE",  // Example: replace with "STRONG", "MODERATE", or "WEAK"
+    "socialActivity": "MODERATE"  // Example: replace with "HIGH", "MODERATE", or "LOW"
+  },
+  "socialLinks": {
+    ${
       metrics.extensions?.website
-        ? `\nWebsite: ${metrics.extensions.website}`
+        ? `"website": "${metrics.extensions.website}",`
         : ""
-    }${
+    }
+    ${
       metrics.extensions?.twitter
-        ? `\nTwitter: ${metrics.extensions.twitter}`
+        ? `"twitter": "${metrics.extensions.twitter}",`
         : ""
-    }${
+    }
+    ${
       metrics.extensions?.telegram
-        ? `\nTelegram: ${metrics.extensions.telegram}`
+        ? `"telegram": "${metrics.extensions.telegram}"`
         : ""
     }
-
-Recent Twitter Activity:${
-      tweets && tweets.length > 0
-        ? tweets
-            .slice(0, 5)
-            .map((tweet, index) => {
-              const tweetDetails = {
-                number: index + 1,
-                url: tweet.permanentUrl,
-                author: `@${tweet.username}`,
-                engagement: `${tweet.likes} likes, ${tweet.retweets} RTs, ${tweet.replies} replies`,
-                views: tweet.views,
-                content:
-                  tweet.text.length > 200
-                    ? `${tweet.text.substring(0, 200)}...`
-                    : tweet.text,
-              };
-              return `\n${tweetDetails.number}. ${tweetDetails.author}: ${tweetDetails.content}\n   ${tweetDetails.engagement} | ${tweetDetails.views} views`;
-            })
-            .join("\n")
-        : "\nNo recent tweets found."
+  },
+  "trustSignals": [
+    {
+      "type": "POSITIVE",  // Example: replace with "POSITIVE", "NEUTRAL", or "NEGATIVE"
+      "category": "LIQUIDITY",  // Example: replace with "LIQUIDITY", "COMMUNITY", "DEVELOPMENT", or "SOCIAL"
+      "text": "Strong liquidity pool with stable depth"  // Example: replace with actual explanation
     }
+  ],
+  "riskFactors": [
+    {
+      "severity": "MEDIUM",  // Example: replace with "HIGH", "MEDIUM", or "LOW"
+      "description": "Moderate concentration of tokens in top holders"  // Example: replace with actual description
+    }
+  ],
+  "safetyChecklist": {
+    "liquidityLocked": true,  // Example: replace with actual boolean
+    "verifiedContract": true,  // Example: replace with actual boolean
+    "activeTeam": true,  // Example: replace with actual boolean
+    "sustainableTokenomics": true,  // Example: replace with actual boolean
+    "communityEngagement": true  // Example: replace with actual boolean
+  },
+  "verdict": {
+    "trustRating": "SAFE",  // Example: replace with "SAFE", "CAUTION", or "HIGH RISK"
+    "summary": "Token shows strong fundamentals with good liquidity and active community",  // Example: replace with actual summary
+    "keyPoints": [
+      "High liquidity and trading volume",  // Example: replace with actual key points
+      "Active development team",
+      "Growing community engagement"
+    ]
+  }
+}
 
-### Trust Score:2/10
+IMPORTANT: Your response must be ONLY the JSON object above with your analysis. Do not include any text before or after the JSON. Ensure all values are properly formatted and the JSON is valid.
 
-Market Health
-- \`Liquidity and Trading Metrics\`: The liquidity metrics and trading volume analysis
-- \`Price Action and Volatility\`: Analysis of price movements and stability
-- \`Market Cap Implications\`: What the market cap suggests about the token
+Guidelines for analysis:
+1. Trust Score (1-10):
+   - Consider liquidity, market cap, holder distribution, and social metrics
+   - Higher scores for established projects with strong metrics
+   - Lower scores for new or risky projects
 
-Community Engagement
-- \`Holder Analysis\`: Assessment of holder distribution and behavior
-- \`Social Media Presence\`: Evaluation of social media activity and reach
-- \`Community Activity\`: Analysis of community engagement and growth
+2. Risk Level:
+   - LOW: Established project with strong metrics
+   - MODERATE: Some concerns but generally stable
+   - HIGH: Multiple red flags or concerning metrics
 
-Risk Assessment
-- \`Key Risks\`: Major risk factors identified
-- \`Warning Signs\`: Potential red flags to consider
-- \`Stability Factors\`: Elements contributing to stability
+3. Trust Signals:
+   - Analyze liquidity depth and stability
+   - Evaluate community engagement and growth
+   - Assess development activity and transparency
+   - Consider social media presence and quality
 
-Key Recommendations
-- \`Main Points\`: Key points for investors to consider
-- \`Risk Mitigation\`: Suggested risk mitigation strategies
-- \`Action Items\`: Recommended next steps
+4. Risk Factors:
+   - Identify potential vulnerabilities
+   - Flag unusual trading patterns
+   - Note governance or centralization risks
+   - Consider market manipulation risks
 
-Social Media Analysis
-- \`Twitter Engagement\`: Analysis of Twitter metrics and reach
-- \`Discussion Quality\`: Assessment of community discussions
-- \`Community Credibility\`: Evaluation of community trustworthiness
+5. Safety Checklist:
+   - Verify liquidity locking status
+   - Check contract verification
+   - Assess team activity and transparency
+   - Evaluate tokenomics sustainability
+   - Gauge community engagement quality
 
-Risk Indicators
-- \`Red Flags\`: Identified warning signs
-- \`Positive Signs\`: Notable positive indicators
-- \`Notable Patterns\`: Observed trading and community patterns`;
+6. Verdict:
+   - Provide clear, actionable summary
+   - Highlight key strengths and concerns
+   - Include specific recommendations
+   - Consider both short and long-term outlook
+
+Ensure all assessments are data-driven and objective. Include specific metrics and observations to support your conclusions.`;
   }
   /**
    * Search for tokens by symbol or name
@@ -586,9 +644,50 @@ var scanCoinAction = {
             });
           }
 
-          await callback({
-            text: `**${metrics.symbol} Final Analysis**\n${analysis}`,
-          });
+          try {
+            // The response is already a valid JSON string, no need for cleaning
+            const analysisData =
+              typeof analysis === "string" ? JSON.parse(analysis) : analysis;
+
+            // Validate required fields
+            if (
+              !analysisData.symbol ||
+              typeof analysisData.trustScore === "undefined" ||
+              !analysisData.riskLevel
+            ) {
+              elizaLogger.error(
+                "Invalid analysis data structure:",
+                analysisData
+              );
+              throw new Error("Missing required fields in analysis data");
+            }
+
+            // Send the structured data
+            await callback({
+              text: JSON.stringify(analysisData, null, 2),
+              type: "bot",
+            });
+          } catch (parseError) {
+            elizaLogger.error("Failed to parse analysis JSON:", parseError);
+            elizaLogger.error("Raw analysis:", analysis);
+
+            // Try to send the raw analysis as a fallback
+            if (
+              typeof analysis === "string" &&
+              analysis.trim().startsWith("{") &&
+              analysis.trim().endsWith("}")
+            ) {
+              await callback({
+                text: analysis,
+                type: "bot",
+              });
+            } else {
+              await callback({
+                text: "Sorry, I encountered an error while formatting the analysis. Please try again.",
+                type: "bot",
+              });
+            }
+          }
         }
       } catch (error) {
         clearInterval(updateInterval);

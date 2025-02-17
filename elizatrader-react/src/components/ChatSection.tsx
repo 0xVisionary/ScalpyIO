@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, Dispatch, SetStateAction } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Message } from '../types';
 import { sendMessage } from '../services/api';
+import AnalysisCard from './AnalysisCard';
 
 interface ChatSectionProps {
   messages: Message[];
@@ -126,7 +127,15 @@ const ChatSection = ({ messages, setMessages, isScanning = false }: ChatSectionP
                         style={{ wordBreak: 'break-word' }}
                       >
                         {message.type === 'bot' ? (
-                          <ReactMarkdown className="[&>*:first-child]:mt-0 [&>*:last-child]:mb-0">{message.text}</ReactMarkdown>
+                          message.text.startsWith('{') && message.text.endsWith('}') ? (
+                            <div className="w-full">
+                              <AnalysisCard data={JSON.parse(message.text)} />
+                            </div>
+                          ) : (
+                            <ReactMarkdown className="[&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                              {message.text}
+                            </ReactMarkdown>
+                          )
                         ) : (
                           message.text
                         )}
