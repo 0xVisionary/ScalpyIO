@@ -99,31 +99,41 @@ const ChatSection = ({ messages, setMessages, isScanning = false }: ChatSectionP
               className={`py-2 ${message.type === 'bot' ? 'bg-[#1a1f2e] -mx-4 px-4' : ''}`}
             >
               <div className="flex items-start">
-                {message.type === 'bot' ? (
-                  <div className="w-7 h-7 shrink-0 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs mr-3">
-                    AI
+                {message.type === 'update' ? (
+                  // Update message - simple text with loading indicator
+                  <div className="w-full text-sm text-blue-400 px-4 py-1 bg-[#242b3d] rounded-md">
+                    {message.text}
                   </div>
                 ) : (
-                  <div className="w-7 h-7 shrink-0 rounded-full bg-gray-600 flex items-center justify-center text-white text-xs mr-3">
-                    U
-                  </div>
-                )}
-                <div className="flex flex-col gap-2 min-w-0 max-w-[85%]">
-                  <div 
-                    className={`text-sm break-words whitespace-pre-wrap text-left inline-block ${
-                      message.type === 'user' 
-                        ? 'bg-blue-500 text-white rounded-2xl rounded-tl-sm py-2 px-3' 
-                        : 'bg-[#242b3d] text-gray-200 rounded-2xl rounded-tl-sm py-2 px-3 prose prose-invert prose-sm max-w-none prose-headings:mt-4 prose-headings:mb-2 prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-blue-400'
-                    }`}
-                    style={{ wordBreak: 'break-word' }}
-                  >
+                  // Regular chat messages (user or bot)
+                  <>
                     {message.type === 'bot' ? (
-                      <ReactMarkdown className="[&>*:first-child]:mt-0 [&>*:last-child]:mb-0">{message.text}</ReactMarkdown>
+                      <div className="w-7 h-7 shrink-0 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs mr-3">
+                        AI
+                      </div>
                     ) : (
-                      message.text
+                      <div className="w-7 h-7 shrink-0 rounded-full bg-gray-600 flex items-center justify-center text-white text-xs mr-3">
+                        U
+                      </div>
                     )}
-                  </div>
-                </div>
+                    <div className="flex flex-col gap-2 min-w-0 max-w-[85%]">
+                      <div 
+                        className={`text-sm break-words whitespace-pre-wrap text-left inline-block ${
+                          message.type === 'user' 
+                            ? 'bg-blue-500 text-white rounded-2xl rounded-tl-sm py-2 px-3' 
+                            : 'bg-[#242b3d] text-gray-200 rounded-2xl rounded-tl-sm py-2 px-3 prose prose-invert prose-sm max-w-none prose-headings:mt-4 prose-headings:mb-2 prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-blue-400'
+                        }`}
+                        style={{ wordBreak: 'break-word' }}
+                      >
+                        {message.type === 'bot' ? (
+                          <ReactMarkdown className="[&>*:first-child]:mt-0 [&>*:last-child]:mb-0">{message.text}</ReactMarkdown>
+                        ) : (
+                          message.text
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           ))}

@@ -1,7 +1,7 @@
 export interface Message {
   id: string;
   text: string;
-  type: 'user' | 'bot';
+  type: 'user' | 'bot' | 'update';
   timestamp: Date;
 }
 

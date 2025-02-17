@@ -1,12 +1,18 @@
-import { AgentRuntime, ModelProviderName, Clients, CacheManager, MemoryCacheAdapter } from '@elizaos/core';
+import {
+  AgentRuntime,
+  ModelProviderName,
+  Clients,
+  CacheManager,
+  MemoryCacheAdapter,
+} from "@elizaos/core";
 import { DirectClient } from "@elizaos/client-direct";
 import { SqliteDatabaseAdapter } from "@elizaos/adapter-sqlite";
-import tradingBuddyPlugin from './tradingBuddyPlugin.js';
+import tradingBuddyPlugin from "./tradingBuddyPlugin.js";
 import { solanaPlugin } from "@elizaos/plugin-solana";
 import Database from "better-sqlite3";
-import dotenv from 'dotenv';
-import express from 'express';
-import http from 'http';
+import dotenv from "dotenv";
+import express from "express";
+import http from "http";
 
 dotenv.config();
 
@@ -18,7 +24,7 @@ try {
     fileMustExist: false,
   });
 } catch (error) {
-  console.error('Failed to initialize SQLite database:', error);
+  console.error("Failed to initialize SQLite database:", error);
   process.exit(1);
 }
 
@@ -83,7 +89,7 @@ try {
   // Create tables
   sqliteDb.exec(sqliteTables);
 } catch (error) {
-  console.error('Failed to create SQLite tables:', error);
+  console.error("Failed to create SQLite tables:", error);
   process.exit(1);
 }
 
@@ -94,11 +100,9 @@ let cacheManager;
 try {
   db = new SqliteDatabaseAdapter(sqliteDb);
   memoryCacheAdapter = new MemoryCacheAdapter();
-  cacheManager = new CacheManager(
-    memoryCacheAdapter
-  );
+  cacheManager = new CacheManager(memoryCacheAdapter);
 } catch (error) {
-  console.error('Failed to initialize adapters:', error);
+  console.error("Failed to initialize adapters:", error);
   process.exit(1);
 }
 
@@ -111,12 +115,15 @@ const testAgent = {
   messageExamples: [
     [
       { role: "user", content: "How can I help you?" },
-      { role: "assistant", content: "I'd love to discuss programming and technology!" }
-    ]
+      {
+        role: "assistant",
+        content: "I'd love to discuss programming and technology!",
+      },
+    ],
   ],
-  settings:{
-    "secrets": {
-      "BIRDEYE_API_KEY":"3231b35365f94d32818c356d73f598ab"
+  settings: {
+    secrets: {
+      BIRDEYE_API_KEY: "3231b35365f94d32818c356d73f598ab",
     },
   },
   postExamples: ["Just learned about a cool new JavaScript feature!"],
@@ -125,7 +132,7 @@ const testAgent = {
   knowledge: [
     "JavaScript is a programming language",
     "Node.js is a JavaScript runtime",
-    "MongoDB is a NoSQL database"
+    "MongoDB is a NoSQL database",
   ],
   clients: [Clients.DIRECT],
   plugins: [tradingBuddyPlugin],
@@ -135,10 +142,10 @@ const testAgent = {
     chat: [
       "I speak in a friendly and informative manner",
       "I use technical terms when appropriate",
-      "I like to give examples"
+      "I like to give examples",
     ],
-    post: ["I write engaging and informative posts about technology"]
-  }
+    post: ["I write engaging and informative posts about technology"],
+  },
 };
 
 // Track active runtimes and ports
@@ -147,7 +154,7 @@ let nextPort = 3001;
 
 async function createAgentRuntime(userId) {
   const port = nextPort++;
-  
+
   try {
     // Initialize runtime with the exact test agent config
     const runtime = new AgentRuntime({
@@ -160,6 +167,9 @@ async function createAgentRuntime(userId) {
     });
 
     await runtime.initialize();
+
+    // Set the userId (extensionId) in the runtime
+    runtime.userId = userId;
 
     // Create express app and server
     const app = express();
@@ -175,21 +185,21 @@ async function createAgentRuntime(userId) {
     app.post(`/${runtime.agentId}/message`, async (req, res) => {
       try {
         const { text, userId, roomId, userName } = req.body;
-        
+
         if (!text || !userId || !roomId || !userName) {
-          return res.status(400).json({ error: 'Missing required fields' });
+          return res.status(400).json({ error: "Missing required fields" });
         }
 
         const response = await runtime.handleMessage({
           content: text,
           userId,
           roomId,
-          userName
+          userName,
         });
 
         res.json({ response: response.content });
       } catch (error) {
-        console.error('Error handling message:', error);
+        console.error("Error handling message:", error);
         res.status(500).json({ error: error.message });
       }
     });
@@ -204,13 +214,15 @@ async function createAgentRuntime(userId) {
       server,
       port,
       agentId: runtime.agentId,
-      userId
+      userId,
     };
 
     runtimeCache.set(userId, runtimeData);
-    
-    console.log(`Agent initialized for user ${userId} on port ${port} with ID ${runtime.agentId}`);
-    
+
+    console.log(
+      `Agent initialized for user ${userId} on port ${port} with ID ${runtime.agentId}`
+    );
+
     return runtimeData;
   } catch (error) {
     console.error(`Failed to create agent runtime for user ${userId}:`, error);
@@ -223,7 +235,7 @@ async function cleanupRuntime(userId) {
   if (runtimeData) {
     try {
       await runtimeData.client.stop();
-      await new Promise(resolve => runtimeData.server.close(resolve));
+      await new Promise((resolve) => runtimeData.server.close(resolve));
       runtimeCache.delete(userId);
       console.log(`Cleaned up runtime for user ${userId}`);
     } catch (error) {
@@ -237,16 +249,16 @@ async function startAgentsForUsers(userIds) {
   try {
     // Start an agent for each user
     const runtimes = await Promise.all(
-      userIds.map(userId => createAgentRuntime(userId))
+      userIds.map((userId) => createAgentRuntime(userId))
     );
 
     console.log("All agents started successfully");
 
     // Handle graceful shutdown
-    process.on('SIGINT', async () => {
-      console.log('Shutting down all agents...');
+    process.on("SIGINT", async () => {
+      console.log("Shutting down all agents...");
       await Promise.all(
-        Array.from(runtimeCache.keys()).map(userId => cleanupRuntime(userId))
+        Array.from(runtimeCache.keys()).map((userId) => cleanupRuntime(userId))
       );
       process.exit(0);
     });
@@ -256,20 +268,16 @@ async function startAgentsForUsers(userIds) {
     console.error("Failed to start agents:", error);
     // Cleanup any successful starts
     await Promise.all(
-      Array.from(runtimeCache.keys()).map(userId => cleanupRuntime(userId))
+      Array.from(runtimeCache.keys()).map((userId) => cleanupRuntime(userId))
     );
     process.exit(1);
   }
 }
 
 // Example usage:
-const userIds = ['user1', 'user2', 'user3'];
+const userIds = ["user1", "user2", "user3"];
 console.log("Starting agents for users...");
 startAgentsForUsers(userIds).catch(console.error);
 
 // Export functions for use in other files
-export {
-  createAgentRuntime,
-  cleanupRuntime,
-  runtimeCache
-}; 
+export { createAgentRuntime, cleanupRuntime, runtimeCache };

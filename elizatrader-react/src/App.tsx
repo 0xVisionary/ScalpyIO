@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Message } from './types'
 import ChatSection from './components/ChatSection'
-import { initializeAgent, sendMessage } from './services/api'
+import { initializeAgent, initializeSocket, sendMessage } from './services/api'
 import './App.css'
 
 function App() {
@@ -27,12 +27,16 @@ function App() {
       const scanCommand = `Scan: ${tokenAddress}`;
       sendMessage(scanCommand)
         .then(response => {
-          setMessages(prev => [...prev, {
-            id: Date.now().toString(),
-            text: scanCommand,
-            type: 'user',
-            timestamp: new Date()
-          }, response]);
+          setMessages(prev => {
+            // Remove any update messages and add the final response
+            const messagesWithoutUpdates = prev.filter(m => m.type !== 'update');
+            return [...messagesWithoutUpdates, {
+              id: Date.now().toString(),
+              text: scanCommand,
+              type: 'user',
+              timestamp: new Date()
+            }, response];
+          });
         })
         .catch(error => {
           console.error('Failed to send scan command:', error);
@@ -74,9 +78,25 @@ function App() {
   };
 
   useEffect(() => {
+    // Initialize socket connection with streaming update handler
+    const socket = initializeSocket((data) => {
+      console.log("DEBUG - Handling streaming update in App:", data);
+      if (data.text) {
+        setMessages(prev => {
+          // Always append messages, regardless of type
+          return [...prev, {
+            id: Date.now().toString(),
+            text: data.text,
+            type: data.type || 'update',
+            timestamp: new Date()
+          }];
+        });
+      }
+    });
+
+    // Initialize agent
     const init = async () => {
       try {
-        // Initialize agent first
         const success = await initializeAgent();
         if (success) {
           setMessages([{
@@ -86,7 +106,6 @@ function App() {
             timestamp: new Date()
           }]);
           
-          // After successful initialization, check for current address
           console.log('Checking for current address...');
           checkCurrentTab();
         } else {
@@ -141,8 +160,12 @@ function App() {
       chrome.tabs.onActivated.removeListener(tabChangeListener);
       chrome.tabs.onUpdated.removeListener(tabUpdateListener);
       port.disconnect();
+      // Cleanup socket on unmount
+      if (socket) {
+        socket.disconnect();
+      }
     };
-  }, [tokenAddress]); // Add tokenAddress to dependencies to access its current value
+  }, []); // Empty dependency array means this runs once on mount
 
   return (
     <div className="flex flex-col min-h-0 bg-[#1a1f2e] text-gray-200 h-full w-full p-0">

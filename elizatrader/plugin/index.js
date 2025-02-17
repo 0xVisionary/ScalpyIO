@@ -6,6 +6,7 @@ import {
   ModelClass,
 } from "@elizaos/core";
 import { Scraper, SearchMode } from "agent-twitter-client";
+import { io } from "../server.js";
 var BirdeyeService = class extends Service {
   apiKey = null;
   runtime = null;
@@ -405,41 +406,204 @@ var scanCoinAction = {
   suppressInitialMessage: true,
   handler: async (runtime, message, _state, _options, callback) => {
     try {
-      elizaLogger2.info("Scanning coin");
+      elizaLogger.info("Scanning coin");
+      const extensionId = runtime.userId;
       const birdeye = runtime.getService("birdeye");
       const twitterScrapper = runtime.getService("twitter-scrapper");
       const text = message.content.text;
-      elizaLogger2.info(`Text: ${text}`);
+
+      elizaLogger.info(`Text: ${text}`);
       const identifier = await birdeye.extractCoinIdentifier(text);
-      elizaLogger2.info(`Identifier: ${identifier}`);
+      elizaLogger.info(`Identifier: ${identifier}`);
+
       if (!identifier) {
+        if (extensionId) {
+          io.to(extensionId).emit("streaming_update", {
+            text: "No valid coin symbol/address found. Please use format like $JUP or provide a Solana address.",
+            type: "update",
+          });
+        }
         callback({
           text: "No valid coin symbol/address found. Please use format like $JUP or provide a Solana address.",
         });
         return false;
       }
-      const metrics = await birdeye.getTokenMetrics(identifier);
-      elizaLogger2.info(`Metrics: ${metrics}`);
-      const tweets = await twitterScrapper.fetchTokenTweets(metrics.address);
-      elizaLogger2.info(`Fetched ${tweets.length} tweets`);
-      const llmPrompt = birdeye.createTrustScorePrompt(metrics, tweets);
-      elizaLogger2.info(`LLM Prompt: ${llmPrompt}`);
-      elizaLogger2.info("Generating analysis...");
-      const analysis = await generateText({
-        context: llmPrompt,
-        modelClass: ModelClass2.LARGE,
-        runtime,
-      });
-      elizaLogger2.info(`Analysis: ${analysis}`);
-      if (analysis && callback) {
-        await callback({
-          text: `**${metrics.symbol} Analysis**  
-                ${analysis}`,
+
+      // Initial status update
+      if (extensionId) {
+        io.to(extensionId).emit("streaming_update", {
+          text: `Analyzing ${identifier}...`,
+          type: "update",
         });
       }
+
+      // Fetch metrics
+      const metrics = await birdeye.getTokenMetrics(identifier);
+      elizaLogger.info(`Metrics: ${metrics}`);
+
+      // Metrics status update
+      if (extensionId) {
+        io.to(extensionId).emit("streaming_update", {
+          text: `Found token metrics for ${
+            metrics.symbol
+          }:\nPrice: $${metrics.price.toFixed(
+            4
+          )}\n24h Change: ${metrics.priceChange24hPercent.toFixed(
+            2
+          )}%\nMarket Cap: $${metrics.mc.toLocaleString()}\nFetching social data...`,
+          type: "update",
+        });
+      }
+
+      // Fetch Twitter data
+      const tweets = await twitterScrapper.fetchTokenTweets(metrics.address);
+      elizaLogger.info(`Fetched ${tweets.length} tweets`);
+
+      // Twitter data status update
+      if (extensionId) {
+        io.to(extensionId).emit("streaming_update", {
+          text: `Analyzing ${tweets.length} recent tweets and market data...`,
+          type: "update",
+        });
+      }
+
+      // Start streaming analysis chunks
+      const analysisChunks = [
+        {
+          title: "Market Overview",
+          content: `Analyzing ${metrics.symbol} with current price $${
+            metrics.price?.toFixed(4) || "N/A"
+          } (${
+            metrics.priceChange24hPercent?.toFixed(2) || "N/A"
+          }% 24h change).\nMarket cap is $${
+            metrics.mc?.toLocaleString() || "N/A"
+          } with $${
+            metrics.liquidity?.toLocaleString() || "N/A"
+          } in liquidity.`,
+        },
+        {
+          title: "Trading Activity",
+          content: `24h trading volume is $${
+            metrics.volume24h?.toLocaleString() || "N/A"
+          } across ${metrics.numberMarkets || "N/A"} markets with ${
+            metrics.trade24h?.toLocaleString() || "N/A"
+          } trades.\nThe token has ${
+            metrics.holder?.toLocaleString() || "N/A"
+          } unique holders.`,
+        },
+        {
+          title: "Social Metrics",
+          content: `Found ${
+            tweets.length
+          } recent tweets discussing this token.\n${
+            metrics.extensions?.twitter
+              ? `Twitter: ${metrics.extensions.twitter}\n`
+              : ""
+          }${
+            metrics.extensions?.telegram
+              ? `Telegram: ${metrics.extensions.telegram}\n`
+              : ""
+          }${
+            metrics.extensions?.website
+              ? `Website: ${metrics.extensions.website}`
+              : ""
+          }`,
+        },
+      ];
+
+      // Emit each analysis chunk with error handling
+      for (const chunk of analysisChunks) {
+        try {
+          if (extensionId) {
+            io.to(extensionId).emit("streaming_update", {
+              text: `**${chunk.title}**\n${chunk.content}`,
+              type: "bot",
+            });
+            // Add a small delay between chunks
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+          }
+        } catch (error) {
+          console.error(`Error emitting chunk ${chunk.title}:`, error);
+          // Continue with next chunk even if one fails
+          continue;
+        }
+      }
+
+      // Generate final analysis
+      const llmPrompt = birdeye.createTrustScorePrompt(metrics, tweets);
+      elizaLogger.info(`LLM Prompt: ${llmPrompt}`);
+      elizaLogger.info("Generating final analysis...");
+
+      if (extensionId) {
+        io.to(extensionId).emit("streaming_update", {
+          text: "🔍 Analyzing market health and trading patterns...",
+          type: "update",
+        });
+      }
+
+      // Start the analysis generation
+      const analysisPromise = generateText({
+        context: llmPrompt,
+        modelClass: ModelClass.LARGE,
+        runtime,
+      });
+
+      // While waiting for analysis, emit progress updates
+      const updateMessages = [
+        "💹 Evaluating price action and volatility...",
+        "🏦 Assessing liquidity and trading metrics...",
+        "👥 Analyzing holder distribution...",
+        "🌐 Evaluating social media presence...",
+        "⚠️ Checking for potential risk factors...",
+        "📊 Calculating final trust score...",
+        "📝 Preparing comprehensive analysis...",
+        "🎯 Finalizing recommendations...",
+      ];
+
+      let messageIndex = 0;
+      const updateInterval = setInterval(() => {
+        if (messageIndex < updateMessages.length && extensionId) {
+          io.to(extensionId).emit("streaming_update", {
+            text: updateMessages[messageIndex],
+            type: "update",
+          });
+          messageIndex++;
+        }
+      }, 2000); // Send a new update every 2 seconds
+
+      try {
+        const analysis = await analysisPromise;
+        // Clear the interval once analysis is complete
+        clearInterval(updateInterval);
+
+        elizaLogger.info(`Analysis: ${analysis}`);
+        if (analysis && callback) {
+          // Final progress update
+          if (extensionId) {
+            io.to(extensionId).emit("streaming_update", {
+              text: "✅ Analysis complete! Preparing final report...",
+              type: "update",
+            });
+          }
+
+          await callback({
+            text: `**${metrics.symbol} Final Analysis**\n${analysis}`,
+          });
+        }
+      } catch (error) {
+        clearInterval(updateInterval);
+        throw error;
+      }
+
       return true;
     } catch (error) {
       console.error("Coin scan failed:", error);
+      if (message.extensionId) {
+        io.to(message.extensionId).emit("streaming_update", {
+          text: "Sorry, I encountered an error while processing your request.",
+          type: "update",
+        });
+      }
       callback({
         text: "Sorry, I couldn't retrieve the coin data at this time. Please try again later.",
       });
