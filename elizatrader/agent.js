@@ -145,7 +145,7 @@ const testAgent = {
   ],
   settings: {
     secrets: {
-      BIRDEYE_API_KEY: "3231b35365f94d32818c356d73f598ab",
+      BIRDEYE_API_KEY: process.env.BIRDEYE_API_KEY,
     },
     memory: {
       enabled: true,
