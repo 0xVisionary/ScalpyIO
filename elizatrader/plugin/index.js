@@ -28,56 +28,207 @@ var BirdeyeService = class extends Service {
     }
   }
   /**
+   * Store the last scanned token for a user
+   * @param userId - The user's ID
+   * @param tokenData - Token data to store
+   */
+  async storeLastToken(userId, tokenData) {
+    try {
+      if (!userId) {
+        elizaLogger.warn("Missing userId in storeLastToken");
+        return;
+      }
+
+      if (!tokenData || typeof tokenData !== "object") {
+        elizaLogger.warn("Invalid tokenData in storeLastToken");
+        return;
+      }
+
+      const db = this.runtime.databaseAdapter;
+      if (!db) {
+        elizaLogger.error("Database adapter not initialized");
+        return;
+      }
+
+      // Wait for runtime to be fully initialized
+      if (!this.runtime.agentId) {
+        elizaLogger.warn(
+          "Runtime not fully initialized, skipping token storage"
+        );
+        return;
+      }
+
+      // Ensure we have required fields with fallbacks
+      const content = {
+        address: tokenData.address || "",
+        symbol: tokenData.symbol || "UNKNOWN",
+        timestamp: Date.now(),
+        name: tokenData.name || "",
+        price: tokenData.price || 0,
+        marketCap: tokenData.mc || 0,
+        liquidity: tokenData.liquidity || 0,
+      };
+
+      const id = `last_token_${userId}`; // Unique ID for this user's last token
+
+      // Delete any existing memory first
+      try {
+        await db.deleteMemories({
+          type: "last_token",
+          userId,
+          roomId: "default",
+          tableName: "memories", // Explicitly specify the table name
+        });
+      } catch (deleteError) {
+        elizaLogger.warn("Error clearing old token memory:", deleteError);
+      }
+
+      // Create new memory entry
+      await db.createMemory({
+        id,
+        type: "last_token",
+        content: JSON.stringify(content),
+        embedding: null, // No embedding needed for this use case
+        userId,
+        roomId: "default",
+        agentId: this.runtime.agentId,
+        unique: true, // Ensure only one last token per user
+        tableName: "memories", // Explicitly specify the table name
+      });
+
+      elizaLogger.info(`Stored last token for user ${userId}:`, content);
+    } catch (error) {
+      elizaLogger.error("Error storing last token:", error);
+      // Don't throw - we want to continue even if storage fails
+    }
+  }
+
+  /**
+   * Get the last scanned token for a user
+   * @param userId - The user's ID
+   * @returns Last token data or null
+   */
+  async getLastToken(userId) {
+    if (!userId) {
+      elizaLogger.debug("No userId provided to getLastToken");
+      return null;
+    }
+
+    const db = this.runtime.databaseAdapter;
+    if (!db) {
+      elizaLogger.error("Database adapter not initialized");
+      return null;
+    }
+
+    try {
+      // Get the most recent memory of type "last_token" for this user
+      const memories = await db.getMemories({
+        tableName: "memories", // Specify the table name
+        roomId: "default",
+        count: 1,
+        unique: true,
+        type: "last_token",
+        userId,
+      });
+
+      if (!memories || memories.length === 0) {
+        elizaLogger.debug(`No last token found for user ${userId}`);
+        return null;
+      }
+
+      const lastToken = memories[0];
+      if (!lastToken.content) {
+        elizaLogger.debug("Invalid token data format, clearing token");
+        await this.clearLastToken(userId);
+        return null;
+      }
+
+      elizaLogger.debug(
+        `Found last token for user ${userId}:`,
+        lastToken.content
+      );
+      return lastToken.content;
+    } catch (error) {
+      elizaLogger.error("Database error in getLastToken:", {
+        error: error.message || error,
+        stack: error.stack,
+        userId,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Clear the last token for a user
+   * @param userId - The user's ID
+   */
+  async clearLastToken(userId) {
+    try {
+      if (!userId) {
+        elizaLogger.warn("No userId provided to clearLastToken");
+        return;
+      }
+
+      const db = this.runtime.databaseAdapter;
+      if (!db) {
+        elizaLogger.error("Database adapter not initialized");
+        return;
+      }
+
+      // Delete memory by type and userId
+      await db.deleteMemories({
+        tableName: "memories", // Specify the table name
+        type: "last_token",
+        userId,
+        roomId: "default",
+      });
+
+      elizaLogger.info(`Cleared last token for user ${userId}`);
+    } catch (error) {
+      elizaLogger.error("Error clearing last token:", error);
+      throw error;
+    }
+  }
+  /**
    * Extract coin symbol/address from text
    * @param text - User input text
+   * @param userId - User ID for state management
    * @returns Symbol (e.g., "JUP") or address
    */
-  async extractCoinIdentifier(text) {
-    try {
-      const prompt = `You are a cryptocurrency token identifier. Extract the token symbol or address from this message. 
-If you find a token symbol (usually prefixed with $) or a Solana address, return it in JSON format.
-Only extract ONE token, preferably the first one mentioned. Make sure you output this in markdown as you would show it in a chat.
-
-Message: "${text}"
-
-Return in this exact JSON format:
-{
-  "symbol": "TOKEN_SYMBOL_WITHOUT_$", // e.g., "JUP" (not $JUP)
-  "address": "SOLANA_ADDRESS_IF_FOUND" // leave empty if not found
-}
-
-Rules:
-- Token symbols are usually prefixed with $ (e.g., $JUP, $BONK)
-- Solana addresses are base58 encoded and 32-44 characters long
-- If no valid token is found, return null for both fields
-- Remove the $ prefix from symbols in the response
-- Only include the first token found`;
-      const result = await generateObjectDeprecated({
-        context: prompt,
-        modelClass: ModelClass.LARGE,
-        runtime: this.runtime,
-      });
-      try {
-        const parsed = result;
-        return parsed?.symbol || parsed?.address;
-      } catch (e) {
-        elizaLogger.error("Failed to parse LLM response:", result);
-      }
-    } catch (error) {
-      elizaLogger.error("Error extracting coin identifier:", error);
+  async extractCoinIdentifier(text, userId) {
+    // First check for a Solana address - updated pattern to match addresses starting with any letter/number
+    const addressMatch = text.match(/\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/);
+    if (addressMatch) {
+      elizaLogger.info(`Found Solana address: ${addressMatch[0]}`);
+      return addressMatch[0];
     }
-    const symbolMatch = text.match(/\$([A-Z]+)/);
-    if (symbolMatch) return symbolMatch[1];
-    const addressMatch = text.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/);
-    return addressMatch ? addressMatch[0] : null;
+
+    // If no address found, check for a token symbol (with or without $)
+    const symbolMatch = text.match(/(?:\$)?([A-Z]{2,})\b/);
+    if (symbolMatch) {
+      try {
+        elizaLogger.info(`Found token symbol: ${symbolMatch[1]}`);
+        // Try to get the address for this symbol
+        const searchResult = await this.searchToken(symbolMatch[1]);
+        if (searchResult.address) {
+          return searchResult.address;
+        }
+      } catch (error) {
+        elizaLogger.error("Error searching for token:", error);
+      }
+    }
+
+    // If no valid identifier found, return null and let ElizaOS handle it
+    return null;
   }
+
   /**
    * Get token metrics from Birdeye
    * @param tokenIdentifier - Token symbol or address
    */
   async getTokenMetrics(tokenIdentifier) {
     let address = tokenIdentifier;
-    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tokenIdentifier)) {
+    if (!/^[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}$/.test(tokenIdentifier)) {
       const searchResult = await this.searchToken(tokenIdentifier);
       if (!searchResult.result?.[0]) {
         throw new Error(`No token found for symbol: ${tokenIdentifier}`);
@@ -106,6 +257,25 @@ Rules:
    */
   createTrustScorePrompt(metrics, tweets) {
     elizaLogger.info("Creating trust score prompt", JSON.stringify(metrics));
+
+    // Add null checks for metrics
+    if (!metrics || typeof metrics !== "object") {
+      elizaLogger.error("Invalid metrics data:", metrics);
+      metrics = {
+        name: "Unknown",
+        symbol: "Unknown",
+        price: 0,
+        priceChange24hPercent: 0,
+        mc: 0,
+        liquidity: 0,
+        holder: 0,
+        volume24h: 0,
+        trade24h: 0,
+        numberMarkets: 0,
+        extensions: {},
+      };
+    }
+
     let twitterAnalysis = "";
     if (tweets && tweets.length > 0) {
       const recentTweets = tweets.slice(0, 5);
@@ -115,14 +285,17 @@ ${recentTweets
   .map((tweet, index) => {
     const tweetDetails = {
       number: index + 1,
-      url: tweet.permanentUrl,
-      author: `@${tweet.username}`,
-      engagement: `${tweet.likes} likes, ${tweet.retweets} retweets, ${tweet.replies} replies`,
-      views: tweet.views,
-      content:
-        tweet.text.length > 200
+      url: tweet.permanentUrl || "",
+      author: tweet.username ? `@${tweet.username}` : "Unknown",
+      engagement: `${tweet.likes || 0} likes, ${
+        tweet.retweets || 0
+      } retweets, ${tweet.replies || 0} replies`,
+      views: tweet.views || 0,
+      content: tweet.text
+        ? tweet.text.length > 200
           ? `${tweet.text.substring(0, 200)}...`
-          : tweet.text,
+          : tweet.text
+        : "",
     };
     return `
 Tweet ${tweetDetails.number} (${tweetDetails.url}):
@@ -138,18 +311,18 @@ Tweet ${tweetDetails.number} (${tweetDetails.url}):
     return `You are a cryptocurrency expert analyst. Analyze the provided metrics and return a structured analysis in the exact JSON format shown below. Include detailed explanations and insights for each section.
 
 Token Metrics:
-- Name: ${metrics.name}
-- Symbol: ${metrics.symbol}
-- Price: $${metrics.price.toFixed(4)}
-- 24h Change: ${metrics.priceChange24hPercent.toFixed(2)}%
-- Market Cap: $${metrics.mc.toLocaleString()}
-- Liquidity: $${metrics.liquidity.toLocaleString()}
-- Holders: ${metrics.holder.toLocaleString()}
+- Name: ${metrics.name || "Unknown"}
+- Symbol: ${metrics.symbol || "Unknown"}
+- Price: $${(metrics.price || 0).toFixed(4)}
+- 24h Change: ${(metrics.priceChange24hPercent || 0).toFixed(2)}%
+- Market Cap: $${(metrics.mc || 0).toLocaleString()}
+- Liquidity: $${(metrics.liquidity || 0).toLocaleString()}
+- Holders: ${(metrics.holder || 0).toLocaleString()}
 - 24h Volume: ${
       metrics.volume24h ? `$${metrics.volume24h.toLocaleString()}` : "N/A"
     }
-- 24h Trades: ${metrics.trade24h.toLocaleString()}
-- Markets: ${metrics.numberMarkets}
+- 24h Trades: ${(metrics.trade24h || 0).toLocaleString()}
+- Markets: ${metrics.numberMarkets || 0}
 ${
   metrics.extensions?.description
     ? `\nDescription: ${metrics.extensions.description}`
@@ -428,64 +601,111 @@ import {
 var scanCoinAction = {
   name: "SCAN_COIN",
   similes: [
-    "SCAN_ADDRESS",
-    "GET_COIN_INFO",
-    "GET_ADDRESS_INFO",
-    "ANALYZE_COIN",
-    "ANALYZE_ADDRESS",
-    "SCAN_TOKEN",
-    "GET_TOKEN_INFO",
-    "ANALYZE_TOKEN",
-    "GET_TOKEN_ANALYSIS",
-    "GET_TOKEN_METRICS",
-    "GET_TOKEN_TWEETS",
-    "GET_TOKEN_TRUST_SCORE",
-    "GET_TOKEN_RISK_SCORE",
-    "GET_TOKEN_SAFETY_SCORE",
-    "TELL_ME_ABOUT_TOKEN",
-    "TELL_ME_ABOUT_COIN",
-    "WHAT_DO_YOU_KNOW_ABOUT_TOKEN",
-    "WHAT_DO_YOU_KNOW_ABOUT_COIN",
-    "IS_TOKEN_SAFE",
-    "IS_COIN_SAFE",
-    "CHECK_TOKEN_SAFETY",
-    "CHECK_COIN_SAFETY",
-    "TOKEN_INFORMATION",
-    "COIN_INFORMATION",
-    "CHECK_ADDRESS",
-    "ANALYZE_THIS_ADDRESS",
-    "WHAT_IS_THIS_ADDRESS",
+    // Token symbol patterns - no $ required
+    "SCAN_[A-Z]+",
+    "ANALYZE_[A-Z]+",
+    "CHECK_[A-Z]+",
+    "IS_[A-Z]+_SAFE",
+    "SHOW_[A-Z]+_ANALYSIS",
+    "GET_[A-Z]+_METRICS",
+    "\\b[A-Z]{2,}\\b", // Direct token symbol (2 or more characters)
+
+    // Direct address patterns - must be exact Solana address format
+    "SCAN_[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}",
+    "ANALYZE_[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}",
+    "CHECK_[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}",
+    "^[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}$", // Exact address match only
+
+    // Combined address patterns
+    "CHECK_ADDRESS_[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}",
+    "ANALYZE_ADDRESS_[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}",
+    "SCAN_ADDRESS_[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}",
   ],
   description:
-    "Analyzes and provides information about Solana coins/tokens including trust scores, safety metrics, and market analysis. This action triggers when users ask about specific tokens using $ symbol (like $JUP, $WIF) or when they provide a Solana token address (like 'So11111111111111111111111111111111111111112'). It handles natural queries like 'What can you tell me about $TOKEN?', 'Is this coin safe?', or 'Can you check this address: So1...'",
+    "Analyzes and provides information about Solana coins/tokens including trust scores, safety metrics, and market analysis. This action triggers when users ask about specific tokens using $ symbol (like $JUP, $WIF) or when they provide a Solana token address. It handles natural queries like 'What can you tell me about $TOKEN?', 'Is this coin safe?', or 'Can you check this address?'",
   validate: async (runtime, message) => {
-    return true;
+    const text = message.content.text.trim();
+    elizaLogger.debug("Validating scan coin action for text:", text);
+
+    // First check if this is an auto-scan request (starts with Scan:)
+    if (/^Scan:/i.test(text)) {
+      const cleanText = text.replace(/^Scan:\s*/i, "").trim();
+      const hasValidIdentifier =
+        /\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/.test(cleanText) ||
+        /(?:\$)?[A-Z]{2,}\b/.test(cleanText);
+      elizaLogger.debug(
+        `Auto-scan request validation result: ${hasValidIdentifier}`
+      );
+      return hasValidIdentifier;
+    }
+
+    // Check for common follow-up question patterns
+    const followUpPatterns = [
+      /^how'?s it looking$/i,
+      /^how does it look$/i,
+      /^what do you think$/i,
+      /^is it safe$/i,
+      /^should i (buy|invest|go for) it$/i,
+      /^what'?s your opinion$/i,
+      /^tell me more$/i,
+      /^what about this one$/i,
+      /^can you analyze this$/i,
+    ];
+
+    if (followUpPatterns.some((pattern) => pattern.test(text))) {
+      elizaLogger.debug("Detected follow-up question, skipping scan");
+      return false;
+    }
+
+    // Then check for a direct token identifier
+    const hasDirectIdentifier =
+      /(?:\$)?[A-Z]{2,}\b|\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/.test(text);
+    if (hasDirectIdentifier) {
+      elizaLogger.debug("Direct token identifier found");
+      return true;
+    }
+
+    // If no direct token identifier, let ElizaOS handle it with memory
+    elizaLogger.debug(
+      "No direct token identifier found, letting ElizaOS handle with memory"
+    );
+    return false;
   },
   suppressInitialMessage: true,
   handler: async (runtime, message, _state, _options, callback) => {
     try {
       elizaLogger.info("Scanning coin");
+      let text = message.content.text;
       const extensionId = runtime.userId;
       const birdeye = runtime.getService("birdeye");
       const twitterScrapper = runtime.getService("twitter-scrapper");
-      const text = message.content.text;
 
-      elizaLogger.info(`Text: ${text}`);
-      const identifier = await birdeye.extractCoinIdentifier(text);
-      elizaLogger.info(`Identifier: ${identifier}`);
+      // Remove "Scan:" prefix if present
+      text = text.replace(/^Scan:\s*/i, "").trim();
+      elizaLogger.info(`Processing text: ${text}`);
+
+      // Handle clear/reset commands first
+      if (/^(clear|reset|forget|start over)$/i.test(text.trim())) {
+        await birdeye.clearLastToken(runtime.userId);
+        await callback({
+          text: "I've cleared your last token. You can start fresh with a new token analysis.",
+          type: "bot",
+        });
+        return true;
+      }
+
+      // Extract token identifier from text
+      const identifier = await birdeye.extractCoinIdentifier(
+        text,
+        runtime.userId
+      );
 
       if (!identifier) {
-        if (extensionId) {
-          io.to(extensionId).emit("streaming_update", {
-            text: "No valid coin symbol/address found. Please use format like $JUP or provide a Solana address.",
-            type: "update",
-          });
-        }
-        callback({
-          text: "No valid coin symbol/address found. Please use format like $JUP or provide a Solana address.",
-        });
+        elizaLogger.debug("No token identifier found");
         return false;
       }
+
+      elizaLogger.info(`Using identifier: ${identifier}`);
 
       // Initial status update
       if (extensionId) {
@@ -497,18 +717,30 @@ var scanCoinAction = {
 
       // Fetch metrics
       const metrics = await birdeye.getTokenMetrics(identifier);
-      elizaLogger.info(`Metrics: ${metrics}`);
+      elizaLogger.info(`Got metrics for ${metrics.symbol}`);
+
+      // Store the token for this user
+      try {
+        await birdeye.storeLastToken(runtime.userId, {
+          address: metrics.address,
+          symbol: metrics.symbol,
+        });
+        elizaLogger.info(`Stored token context for user ${runtime.userId}`);
+      } catch (storeError) {
+        elizaLogger.error("Failed to store token context:", storeError);
+        // Continue with analysis even if storage fails
+      }
 
       // Metrics status update
       if (extensionId) {
         io.to(extensionId).emit("streaming_update", {
           text: `Found token metrics for ${
-            metrics.symbol
-          }:\nPrice: $${metrics.price.toFixed(
-            4
-          )}\n24h Change: ${metrics.priceChange24hPercent.toFixed(
-            2
-          )}%\nMarket Cap: $${metrics.mc.toLocaleString()}\nFetching social data...`,
+            metrics.symbol || "Unknown"
+          }:\nPrice: $${(metrics.price || 0).toFixed(4)}\n24h Change: ${(
+            metrics.priceChange24hPercent || 0
+          ).toFixed(2)}%\nMarket Cap: $${(
+            metrics.mc || 0
+          ).toLocaleString()}\nFetching social data...`,
           type: "update",
         });
       }

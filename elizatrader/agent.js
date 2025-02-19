@@ -6,13 +6,14 @@ import {
   MemoryCacheAdapter,
 } from "@elizaos/core";
 import { DirectClient } from "@elizaos/client-direct";
-import { SqliteDatabaseAdapter } from "@elizaos/adapter-sqlite";
 import tradingBuddyPlugin from "./tradingBuddyPlugin.js";
 import { solanaPlugin } from "@elizaos/plugin-solana";
 import Database from "better-sqlite3";
 import dotenv from "dotenv";
 import express from "express";
 import http from "http";
+import { elizaLogger } from "@elizaos/core";
+import { CustomSqliteAdapter } from "./CustomSqliteAdapter.js";
 
 dotenv.config();
 
@@ -32,15 +33,10 @@ try {
 const sqliteTables = `
 CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY,
-  name TEXT,
+  name TEXT DEFAULT 'User',
   username TEXT,
-  email TEXT UNIQUE,
-  avatarUrl TEXT,
   details TEXT DEFAULT '{}',
   is_agent INTEGER DEFAULT 0,
-  location TEXT,
-  profile_line TEXT,
-  signed_tos INTEGER DEFAULT 0,
   createdAt INTEGER DEFAULT (unixepoch())
 );
 
@@ -62,12 +58,12 @@ CREATE TABLE IF NOT EXISTS memories (
   id TEXT PRIMARY KEY,
   type TEXT NOT NULL,
   content TEXT NOT NULL,
-  embedding BLOB,
+  embedding BLOB DEFAULT NULL,
   userId TEXT NOT NULL,
-  roomId TEXT NOT NULL,
+  roomId TEXT NOT NULL DEFAULT 'default',
   agentId TEXT NOT NULL,
   "unique" INTEGER DEFAULT 0,
-  createdAt INTEGER NOT NULL
+  createdAt INTEGER DEFAULT (unixepoch())
 );
 
 CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts
@@ -98,7 +94,7 @@ let db;
 let memoryCacheAdapter;
 let cacheManager;
 try {
-  db = new SqliteDatabaseAdapter(sqliteDb);
+  db = new CustomSqliteAdapter(sqliteDb);
   memoryCacheAdapter = new MemoryCacheAdapter();
   cacheManager = new CacheManager(memoryCacheAdapter);
 } catch (error) {
@@ -110,41 +106,71 @@ const testAgent = {
   name: "Test Bot",
   modelProvider: ModelProviderName.OPENAI,
   model: "large",
-  bio: ["I am an AI who loves helping developers"],
-  lore: ["I was created to assist with coding questions"],
+  bio: ["I am an AI who loves helping developers and analyzing crypto tokens"],
+  lore: ["I was created to assist with token analysis and trading questions"],
   messageExamples: [
     [
       { role: "user", content: "How can I help you?" },
       {
         role: "assistant",
-        content: "I'd love to discuss programming and technology!",
+        content:
+          "I'd love to help you analyze tokens and answer your trading questions!",
       },
     ],
+    [
+      { role: "user", content: "how is it?" },
+      {
+        role: "assistant",
+        content:
+          "Let me check the token we were discussing and provide an update on its status.",
+      },
+    ],
+  ],
+  postExamples: [
+    {
+      content:
+        "Just analyzed $BONK - strong liquidity and growing community! Trust score: 8/10 🚀",
+      tags: ["crypto", "analysis", "solana"],
+    },
+    {
+      content:
+        "New token analysis: $JUP shows promising metrics with solid fundamentals. Market cap and volume trending up 📈",
+      tags: ["trading", "metrics", "analysis"],
+    },
+    {
+      content:
+        "Quick safety check on $WIF: Verified contract ✅ Active development ✅ Growing holders 📈",
+      tags: ["safety", "token", "analysis"],
+    },
   ],
   settings: {
     secrets: {
       BIRDEYE_API_KEY: "3231b35365f94d32818c356d73f598ab",
     },
+    memory: {
+      enabled: true,
+      contextWindow: 10, // Remember last 10 messages for context
+      useLastToken: true, // Enable using last token context
+    },
   },
-  postExamples: ["Just learned about a cool new JavaScript feature!"],
-  topics: ["technology", "programming", "web development"],
-  adjectives: ["helpful", "knowledgeable", "friendly"],
+  topics: ["cryptocurrency", "trading", "token analysis", "market metrics"],
+  adjectives: ["analytical", "informative", "precise"],
   knowledge: [
-    "JavaScript is a programming language",
-    "Node.js is a JavaScript runtime",
-    "MongoDB is a NoSQL database",
+    "I can analyze Solana tokens and provide detailed metrics",
+    "I maintain context of our conversation and the last token we discussed",
+    "I can answer follow-up questions about previously analyzed tokens",
   ],
   clients: [Clients.DIRECT],
   plugins: [tradingBuddyPlugin],
-  system: "You are a helpful AI assistant who loves to talk about technology.",
+  system:
+    "You are a helpful AI assistant specializing in crypto token analysis. You maintain conversation context and can discuss previously analyzed tokens.",
   style: {
-    all: ["I communicate clearly and precisely"],
+    all: ["I communicate clearly and maintain context"],
     chat: [
       "I speak in a friendly and informative manner",
-      "I use technical terms when appropriate",
-      "I like to give examples",
+      "I reference previous context when appropriate",
+      "I provide detailed analysis when discussing tokens",
     ],
-    post: ["I write engaging and informative posts about technology"],
   },
 };
 
@@ -170,6 +196,25 @@ async function createAgentRuntime(userId) {
 
     // Set the userId (extensionId) in the runtime
     runtime.userId = userId;
+
+    // Ensure user exists in database with extensionId as primary identifier
+    try {
+      await db.createAccount({
+        id: userId,
+        name: "User",
+        username: `user_${userId.substring(0, 8)}`,
+        details: "{}",
+        is_agent: 0,
+      });
+      elizaLogger.info(`Created account for user ${userId}`);
+    } catch (error) {
+      // Ignore unique constraint error as user might already exist
+      if (!error.message?.includes("UNIQUE constraint")) {
+        elizaLogger.error(`Error creating account for user ${userId}:`, error);
+        throw error;
+      }
+      elizaLogger.debug(`Account already exists for user ${userId}`);
+    }
 
     // Create express app and server
     const app = express();
@@ -280,4 +325,4 @@ console.log("Starting agents for users...");
 startAgentsForUsers(userIds).catch(console.error);
 
 // Export functions for use in other files
-export { createAgentRuntime, cleanupRuntime, runtimeCache };
+export { createAgentRuntime, cleanupRuntime, runtimeCache, sqliteDb };

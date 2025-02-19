@@ -124,15 +124,53 @@ export const sendMessage = async (text: string): Promise<Message> => {
   );
 
   const data = await response.json();
-  const messageData = Array.isArray(data) ? data[0] : data;
-
-  if (!messageData.text) {
-    throw new Error("Invalid response from agent");
+  
+  // Handle case where no message is returned
+  if (!data || (Array.isArray(data) && data.length === 0)) {
+    return {
+      id: Date.now().toString(),
+      text: "I'm not sure how to respond to that. Could you please rephrase or ask something else?",
+      type: 'bot',
+      timestamp: new Date(),
+    };
   }
 
+  const messageData = Array.isArray(data) ? data[0] : data;
+
+  // Check if we have a response object with content
+  if (messageData.response && typeof messageData.response === 'string') {
+    return {
+      id: Date.now().toString(),
+      text: messageData.response,
+      type: 'bot',
+      timestamp: new Date(),
+    };
+  }
+
+  // If we have direct text in the response
+  if (messageData.text) {
+    return {
+      id: Date.now().toString(),
+      text: messageData.text,
+      type: 'bot',
+      timestamp: new Date(),
+    };
+  }
+
+  // If we have content in the response
+  if (messageData.content) {
+    return {
+      id: Date.now().toString(),
+      text: typeof messageData.content === 'string' ? messageData.content : messageData.content.text,
+      type: 'bot',
+      timestamp: new Date(),
+    };
+  }
+
+  // Fallback message if no valid response format is found
   return {
     id: Date.now().toString(),
-    text: messageData.text,
+    text: "I'm not sure how to respond to that. Could you please rephrase or ask something else?",
     type: 'bot',
     timestamp: new Date(),
   };
