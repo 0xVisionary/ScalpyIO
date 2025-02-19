@@ -5,7 +5,40 @@ import { Server } from "socket.io";
 import http from "http";
 
 const app = express();
-app.use(cors());
+
+// Define allowed origins
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:5173", // Vite dev server
+  /^chrome-extension:\/\/.*/, // Allow any Chrome extension
+];
+
+// Configure CORS for Express
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // Check if the origin is allowed
+      const isAllowed = allowedOrigins.some((allowed) =>
+        typeof allowed === "string" ? allowed === origin : allowed.test(origin)
+      );
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
 app.use(express.json());
 
 // Create HTTP server
@@ -15,9 +48,19 @@ const server = http.createServer(app);
 console.log("DEBUG - Initializing Socket.IO server");
 export const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: function (origin, callback) {
+      if (!origin) {
+        return callback(null, true);
+      }
+      const isAllowed = allowedOrigins.some((allowed) =>
+        typeof allowed === "string" ? allowed === origin : allowed.test(origin)
+      );
+      callback(null, isAllowed);
+    },
     methods: ["GET", "POST"],
+    credentials: true,
   },
+  transports: ["websocket", "polling"],
 });
 
 io.on("connection", (socket) => {
