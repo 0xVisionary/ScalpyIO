@@ -11,6 +11,7 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:5173", // Vite dev server
+  "https://scalpy-server-41f6c3cfd811.herokuapp.com",
   /^chrome-extension:\/\/.*/, // Allow any Chrome extension
 ];
 
@@ -169,7 +170,8 @@ app.post("/cleanup_agent", async (req, res) => {
   }
 });
 
-const PORT = 3000;
+
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Agent management server running on port ${PORT}`);
 });

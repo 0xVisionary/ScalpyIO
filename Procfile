@@ -1,1 +1,1 @@
-web: node elizatrader/server.js 
+web: cd elizatrader && node server.js 
