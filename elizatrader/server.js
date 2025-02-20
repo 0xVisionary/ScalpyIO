@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import rateLimit from "express-rate-limit";
 import { createAgentRuntime, cleanupRuntime } from "./agent.js";
 import { Server } from "socket.io";
 import http from "http";
@@ -12,6 +13,28 @@ const allowedOrigins = [
   "http://localhost:5173", // Vite dev server
   /^chrome-extension:\/\/.*/, // Allow any Chrome extension
 ];
+
+// Configure rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: "Too many requests from this IP, please try again later.",
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+
+// Apply rate limiting to all routes
+app.use(limiter);
+
+// Create more strict rate limit for agent creation
+const createAgentLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // Limit each IP to 5 agent creations per hour
+  message:
+    "Too many agent creation attempts from this IP, please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Configure CORS for Express
 app.use(
@@ -35,7 +58,13 @@ app.use(
     },
     methods: ["GET", "POST", "OPTIONS"],
     credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+      "Origin",
+    ],
   })
 );
 
@@ -45,7 +74,7 @@ app.use(express.json());
 const server = http.createServer(app);
 
 // Initialize Socket.IO with CORS config
-console.log("DEBUG - Initializing Socket.IO server");
+console.log("Initializing Socket.IO server");
 export const io = new Server(server, {
   cors: {
     origin: function (origin, callback) {
@@ -59,6 +88,7 @@ export const io = new Server(server, {
     },
     methods: ["GET", "POST"],
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   },
   transports: ["websocket", "polling"],
 });
@@ -96,7 +126,7 @@ io.on("connection", (socket) => {
 });
 
 // Create new agent runtime
-app.post("/create_agent", async (req, res) => {
+app.post("/create_agent", createAgentLimiter, async (req, res) => {
   try {
     const { extensionId } = req.body;
     console.log("DEBUG - Creating agent for extensionId:", extensionId);
