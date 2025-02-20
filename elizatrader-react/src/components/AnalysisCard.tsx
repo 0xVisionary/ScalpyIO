@@ -64,27 +64,13 @@ const TrustScoreIndicator: React.FC<{ score: number }> = ({ score }) => {
           <div
             key={i}
             className={`w-1.5 h-1.5 rounded-full ${
-              i < filledDots ? 'bg-blue-500' : 'bg-gray-600'
+              i < filledDots ? 'bg-[#8131CF]' : 'bg-gray-600'
             }`}
           />
         ))}
       </div>
       <span className="text-gray-400 ml-2">{score}/10</span>
     </div>
-  );
-};
-
-const SafetyBadge: React.FC<{ rating: 'SAFE' | 'CAUTION' | 'HIGH RISK' }> = ({ rating }) => {
-  const colors = {
-    SAFE: 'bg-green-500',
-    CAUTION: 'bg-yellow-500',
-    'HIGH RISK': 'bg-red-500',
-  } as const;
-  
-  return (
-    <span className={`px-2 py-1 rounded text-xs font-semibold ${colors[rating]} text-black`}>
-      {rating}
-    </span>
   );
 };
 
@@ -125,7 +111,7 @@ const SocialLinks: React.FC<{ links?: AnalysisData['socialLinks'] }> = ({ links 
           href={links.twitter}
           target="_blank"
           rel="noopener noreferrer"
-          className="p-2 bg-[#242b3d] rounded-lg hover:bg-[#2d3548] transition-colors"
+          className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           title="Twitter"
         >
           <svg className="w-5 h-5 text-[#1DA1F2]" fill="currentColor" viewBox="0 0 24 24">
@@ -138,7 +124,7 @@ const SocialLinks: React.FC<{ links?: AnalysisData['socialLinks'] }> = ({ links 
           href={links.telegram}
           target="_blank"
           rel="noopener noreferrer"
-          className="p-2 bg-[#242b3d] rounded-lg hover:bg-[#2d3548] transition-colors"
+          className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           title="Telegram"
         >
           <svg className="w-5 h-5 text-[#0088cc]" fill="currentColor" viewBox="0 0 24 24">
@@ -151,10 +137,10 @@ const SocialLinks: React.FC<{ links?: AnalysisData['socialLinks'] }> = ({ links 
           href={links.website}
           target="_blank"
           rel="noopener noreferrer"
-          className="p-2 bg-[#242b3d] rounded-lg hover:bg-[#2d3548] transition-colors"
+          className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
           title="Website"
         >
-          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-[#8131CF]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
           </svg>
         </a>
@@ -171,13 +157,13 @@ const AnalysisCard: React.FC<{ data: AnalysisData }> = ({ data }) => {
   const isLoading = data.isLoading || {};
 
   return (
-    <div className="bg-[#1a1f2e] rounded-lg border border-[#2d3548] shadow-lg overflow-hidden">
+    <div className="bg-[radial-gradient(#f8f9fa_25%,#ffffff_75%)] rounded-lg border border-gray-200 overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-[#242b3d] to-[#1a1f2e] p-4 border-b border-[#2d3548]">
+      <div className="bg-transparent p-4 border-b border-gray-200">
         <div className="flex justify-between items-start">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-4">
-              <h2 className="text-xl font-bold text-white">{data.symbol} Trust Analysis</h2>
+              <h2 className="text-xl font-bold text-[#0F172A]">{data.symbol} Trust Analysis</h2>
               {isLoading.analysis ? (
                 <Shimmer className="w-24 h-6 rounded" />
               ) : (
@@ -189,21 +175,16 @@ const AnalysisCard: React.FC<{ data: AnalysisData }> = ({ data }) => {
             {isLoading.analysis ? (
               <Shimmer className="w-full h-4 rounded" />
             ) : (
-              <p className="text-gray-300 text-sm">{data.verdict.summary}</p>
+              <p className="text-[#0F172A] text-sm">{data.verdict.summary}</p>
             )}
             {!isLoading.metrics && <SocialLinks links={data.socialLinks} />}
           </div>
-          {isLoading.analysis ? (
-            <Shimmer className="w-20 h-6 rounded" />
-          ) : (
-            <SafetyBadge rating={data.verdict.trustRating} />
-          )}
         </div>
       </div>
 
       {/* Safety Checklist */}
-      <div className="p-4 border-b border-[#2d3548]">
-        <h3 className="text-sm font-semibold text-gray-400 mb-3">SAFETY CHECKLIST</h3>
+      <div className="p-4 border-b border-gray-200 bg-transparent">
+        <h3 className="text-sm font-semibold text-[#0F172A] mb-3">SAFETY CHECKLIST</h3>
         <div className="grid grid-cols-2 gap-4">
           {isLoading.analysis ? (
             Array(6).fill(0).map((_, i) => (
@@ -221,7 +202,7 @@ const AnalysisCard: React.FC<{ data: AnalysisData }> = ({ data }) => {
                 <span className={`text-2xl ${value ? 'text-green-500' : 'text-red-500'}`}>
                   {value ? '✓' : '✗'}
                 </span>
-                <span className="text-gray-300 capitalize">
+                <span className="text-[#0F172A] capitalize">
                   {key.replace(/([A-Z])/g, ' $1').trim()}
                 </span>
               </div>
@@ -231,8 +212,8 @@ const AnalysisCard: React.FC<{ data: AnalysisData }> = ({ data }) => {
       </div>
 
       {/* Trust Signals */}
-      <div className="p-4 border-b border-[#2d3548]">
-        <h3 className="text-sm font-semibold text-gray-400 mb-3">TRUST SIGNALS</h3>
+      <div className="p-4 border-b border-gray-200 bg-transparent">
+        <h3 className="text-sm font-semibold text-[#0F172A] mb-3">TRUST SIGNALS</h3>
         <div className="space-y-3">
           {isLoading.analysis ? (
             Array(3).fill(0).map((_, i) => (
@@ -240,21 +221,21 @@ const AnalysisCard: React.FC<{ data: AnalysisData }> = ({ data }) => {
             ))
           ) : (
             (data.trustSignals || []).map((signal, i) => (
-              <div key={i} className="flex items-start gap-3 bg-[#242b3d] p-3 rounded-lg">
-                <div className="shrink-0 text-gray-400">
+              <div key={i} className="flex items-start gap-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <div className="shrink-0 text-[#8131CF]">
                   <CategoryIcon category={signal.category} />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`text-sm font-medium ${
-                      signal.type === 'POSITIVE' ? 'text-green-500' :
-                      signal.type === 'NEGATIVE' ? 'text-red-500' :
-                      'text-yellow-500'
+                      signal.type === 'POSITIVE' ? 'text-green-600' :
+                      signal.type === 'NEGATIVE' ? 'text-red-600' :
+                      'text-yellow-600'
                     }`}>
                       {signal.category}
                     </span>
                   </div>
-                  <p className="text-gray-300 text-sm">{signal.text}</p>
+                  <p className="text-[#0F172A] text-sm">{signal.text}</p>
                 </div>
               </div>
             ))
@@ -263,8 +244,8 @@ const AnalysisCard: React.FC<{ data: AnalysisData }> = ({ data }) => {
       </div>
 
       {/* Risk Factors */}
-      <div className="p-4 border-b border-[#2d3548]">
-        <h3 className="text-sm font-semibold text-gray-400 mb-3">RISK FACTORS</h3>
+      <div className="p-4 border-b border-gray-200 bg-transparent">
+        <h3 className="text-sm font-semibold text-[#0F172A] mb-3">RISK FACTORS</h3>
         <div className="space-y-2">
           {isLoading.analysis ? (
             Array(3).fill(0).map((_, i) => (
@@ -277,10 +258,10 @@ const AnalysisCard: React.FC<{ data: AnalysisData }> = ({ data }) => {
                   risk.severity === 'HIGH' ? 'bg-red-500' :
                   risk.severity === 'MEDIUM' ? 'bg-yellow-500' :
                   'bg-green-500'
-                } text-black`}>
+                } text-white`}>
                   {risk.severity}
                 </span>
-                <span className="text-gray-300 text-sm">{risk.description}</span>
+                <span className="text-[#0F172A] text-sm">{risk.description}</span>
               </div>
             ))
           )}
@@ -288,8 +269,8 @@ const AnalysisCard: React.FC<{ data: AnalysisData }> = ({ data }) => {
       </div>
 
       {/* Community & Social */}
-      <div className="p-4 border-b border-[#2d3548]">
-        <h3 className="text-sm font-semibold text-gray-400 mb-3">COMMUNITY & SOCIAL</h3>
+      <div className="p-4 border-b border-gray-200 bg-transparent">
+        <h3 className="text-sm font-semibold text-[#0F172A] mb-3">COMMUNITY & SOCIAL</h3>
         <div className="grid grid-cols-2 gap-4">
           {isLoading.social ? (
             Array(4).fill(0).map((_, i) => (
@@ -299,21 +280,21 @@ const AnalysisCard: React.FC<{ data: AnalysisData }> = ({ data }) => {
             <>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-gray-300">Community Health:</span>
+                  <span className="text-[#0F172A]">Community Health:</span>
                   <span className={`font-medium ${
-                    data.socialMetrics?.communityHealth === 'STRONG' ? 'text-green-500' :
-                    data.socialMetrics?.communityHealth === 'WEAK' ? 'text-red-500' :
-                    'text-yellow-500'
+                    data.socialMetrics?.communityHealth === 'STRONG' ? 'text-green-600' :
+                    data.socialMetrics?.communityHealth === 'WEAK' ? 'text-red-600' :
+                    'text-yellow-600'
                   }`}>
                     {data.socialMetrics?.communityHealth || 'MODERATE'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-300">Social Activity:</span>
+                  <span className="text-[#0F172A]">Social Activity:</span>
                   <span className={`font-medium ${
-                    data.socialMetrics?.socialActivity === 'HIGH' ? 'text-green-500' :
-                    data.socialMetrics?.socialActivity === 'LOW' ? 'text-red-500' :
-                    'text-yellow-500'
+                    data.socialMetrics?.socialActivity === 'HIGH' ? 'text-green-600' :
+                    data.socialMetrics?.socialActivity === 'LOW' ? 'text-red-600' :
+                    'text-yellow-600'
                   }`}>
                     {data.socialMetrics?.socialActivity || 'LOW'}
                   </span>
@@ -321,12 +302,12 @@ const AnalysisCard: React.FC<{ data: AnalysisData }> = ({ data }) => {
               </div>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-gray-300">Holders:</span>
-                  <span className="text-white">{data.socialMetrics?.holders?.toLocaleString() || '0'}</span>
+                  <span className="text-[#0F172A]">Holders:</span>
+                  <span className="text-[#0F172A]">{data.socialMetrics?.holders?.toLocaleString() || '0'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-300">Active Holders:</span>
-                  <span className="text-white">{data.socialMetrics?.activeHolders?.toLocaleString() || '0'}</span>
+                  <span className="text-[#0F172A]">Active Holders:</span>
+                  <span className="text-[#0F172A]">{data.socialMetrics?.activeHolders?.toLocaleString() || '0'}</span>
                 </div>
               </div>
             </>
@@ -335,8 +316,8 @@ const AnalysisCard: React.FC<{ data: AnalysisData }> = ({ data }) => {
       </div>
 
       {/* Key Points */}
-      <div className="p-4 bg-gradient-to-r from-[#242b3d] to-[#1a1f2e]">
-        <h3 className="text-sm font-semibold text-gray-400 mb-3">KEY POINTS</h3>
+      <div className="p-4 bg-transparent">
+        <h3 className="text-sm font-semibold text-[#0F172A] mb-3">KEY POINTS</h3>
         {isLoading.analysis ? (
           <div className="space-y-2">
             {Array(3).fill(0).map((_, i) => (
@@ -347,8 +328,8 @@ const AnalysisCard: React.FC<{ data: AnalysisData }> = ({ data }) => {
           <ul className="space-y-2">
             {(data.verdict?.keyPoints || []).map((point, i) => (
               <li key={i} className="flex items-start gap-2">
-                <span className="text-blue-500 mt-1">•</span>
-                <span className="text-gray-300 text-sm">{point}</span>
+                <span className="text-[#8131CF] mt-1">•</span>
+                <span className="text-[#0F172A] text-sm">{point}</span>
               </li>
             ))}
           </ul>

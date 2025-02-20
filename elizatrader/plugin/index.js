@@ -6,7 +6,7 @@ import {
   ModelClass,
 } from "@elizaos/core";
 import { Scraper, SearchMode } from "agent-twitter-client";
-import { io } from "../server.js";
+import { getIO } from "../socket.js";
 var BirdeyeService = class extends Service {
   apiKey = null;
   runtime = null;
@@ -223,36 +223,6 @@ var BirdeyeService = class extends Service {
   }
 
   /**
-   * Get token metrics from Birdeye
-   * @param tokenIdentifier - Token symbol or address
-   */
-  async getTokenMetrics(tokenIdentifier) {
-    let address = tokenIdentifier;
-    if (!/^[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}$/.test(tokenIdentifier)) {
-      const searchResult = await this.searchToken(tokenIdentifier);
-      if (!searchResult.result?.[0]) {
-        throw new Error(`No token found for symbol: ${tokenIdentifier}`);
-      }
-      address = searchResult.result[0].address;
-    }
-    const endpoint = `https://public-api.birdeye.so/defi/token_overview?address=${address}`;
-    const response = await fetch(endpoint, {
-      headers: {
-        "X-API-KEY": this.apiKey,
-        Accept: "application/json",
-        "x-chain": "solana",
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.statusText}`);
-    }
-    const data = await response.json();
-    if (!data.success) {
-      throw new Error("Failed to fetch token metrics");
-    }
-    return data.data;
-  }
-  /**
    * Format data for LLM trust score analysis
    */
   createTrustScorePrompt(metrics, tweets) {
@@ -457,23 +427,23 @@ Ensure all assessments are data-driven and objective. Include specific metrics a
    */
   async searchToken(keyword) {
     console.log("Searching for token:", keyword);
-    const endpoint = `https://public-api.birdeye.so/defi/v3/search?chain=solana&keyword=${encodeURIComponent(
-      keyword
-    )}&target=token&sort_by=volume_24h_usd&sort_type=desc&offset=0&limit=1`;
+    const endpoint = `https://public-api.birdeye.so/defi/token_overview?address=${keyword}`;
     const response = await fetch(endpoint, {
       headers: {
         "X-API-KEY": this.apiKey,
         Accept: "application/json",
+        "x-chain": "solana",
       },
     });
     if (!response.ok) {
       throw new Error(`Search API request failed: ${response.statusText}`);
     }
     const data = await response.json();
-    if (!data.success || !data.data?.items?.[0]) {
+    console.log("Search API Response data:", data);
+    if (!data.success || !data.data) {
       throw new Error("Failed to search for token");
     }
-    return data.data.items[0];
+    return data.data;
   }
 };
 var TwitterScrapperService = class extends Service {
@@ -709,14 +679,21 @@ var scanCoinAction = {
 
       // Initial status update
       if (extensionId) {
-        io.to(extensionId).emit("streaming_update", {
-          text: `Analyzing ${identifier}...`,
-          type: "update",
+        console.log("DEBUG - Emitting initial analysis update:", {
+          extensionId,
+          message: `Analyzing ${identifier}...`,
+          socketInstance: !!getIO(),
         });
+        getIO()
+          .to(extensionId)
+          .emit("streaming_update", {
+            text: `Analyzing ${identifier}...`,
+            type: "update",
+          });
       }
 
       // Fetch metrics
-      const metrics = await birdeye.getTokenMetrics(identifier);
+      const metrics = await birdeye.searchToken(identifier);
       elizaLogger.info(`Got metrics for ${metrics.symbol}`);
 
       // Store the token for this user
@@ -733,16 +710,23 @@ var scanCoinAction = {
 
       // Metrics status update
       if (extensionId) {
-        io.to(extensionId).emit("streaming_update", {
-          text: `Found token metrics for ${
-            metrics.symbol || "Unknown"
-          }:\nPrice: $${(metrics.price || 0).toFixed(4)}\n24h Change: ${(
-            metrics.priceChange24hPercent || 0
-          ).toFixed(2)}%\nMarket Cap: $${(
-            metrics.mc || 0
-          ).toLocaleString()}\nFetching social data...`,
-          type: "update",
+        console.log("DEBUG - Emitting metrics update:", {
+          extensionId,
+          symbol: metrics.symbol,
+          socketInstance: !!getIO(),
         });
+        getIO()
+          .to(extensionId)
+          .emit("streaming_update", {
+            text: `Found token metrics for ${
+              metrics.symbol || "Unknown"
+            }:\nPrice: $${(metrics.price || 0).toFixed(4)}\n24h Change: ${(
+              metrics.priceChange24hPercent || 0
+            ).toFixed(2)}%\nMarket Cap: $${(
+              metrics.mc || 0
+            ).toLocaleString()}\nFetching social data...`,
+            type: "update",
+          });
       }
 
       // Fetch Twitter data
@@ -751,10 +735,17 @@ var scanCoinAction = {
 
       // Twitter data status update
       if (extensionId) {
-        io.to(extensionId).emit("streaming_update", {
-          text: `Analyzing ${tweets.length} recent tweets and market data...`,
-          type: "update",
+        console.log("DEBUG - Emitting twitter data update:", {
+          extensionId,
+          tweetCount: tweets.length,
+          socketInstance: !!getIO(),
         });
+        getIO()
+          .to(extensionId)
+          .emit("streaming_update", {
+            text: `Analyzing ${tweets.length} recent tweets and market data...`,
+            type: "update",
+          });
       }
 
       // Start streaming analysis chunks
@@ -805,10 +796,17 @@ var scanCoinAction = {
       for (const chunk of analysisChunks) {
         try {
           if (extensionId) {
-            io.to(extensionId).emit("streaming_update", {
-              text: `**${chunk.title}**\n${chunk.content}`,
-              type: "bot",
+            console.log("DEBUG - Emitting analysis chunk:", {
+              extensionId,
+              chunkTitle: chunk.title,
+              socketInstance: !!getIO(),
             });
+            getIO()
+              .to(extensionId)
+              .emit("streaming_update", {
+                text: `**${chunk.title}**\n${chunk.content}`,
+                type: "bot",
+              });
             // Add a small delay between chunks
             await new Promise((resolve) => setTimeout(resolve, 1500));
           }
@@ -825,7 +823,11 @@ var scanCoinAction = {
       elizaLogger.info("Generating final analysis...");
 
       if (extensionId) {
-        io.to(extensionId).emit("streaming_update", {
+        console.log("DEBUG - Emitting analysis start:", {
+          extensionId,
+          socketInstance: !!getIO(),
+        });
+        getIO().to(extensionId).emit("streaming_update", {
           text: "🔍 Analyzing market health and trading patterns...",
           type: "update",
         });
@@ -853,7 +855,13 @@ var scanCoinAction = {
       let messageIndex = 0;
       const updateInterval = setInterval(() => {
         if (messageIndex < updateMessages.length && extensionId) {
-          io.to(extensionId).emit("streaming_update", {
+          console.log("DEBUG - Emitting progress update:", {
+            extensionId,
+            messageIndex,
+            message: updateMessages[messageIndex],
+            socketInstance: !!getIO(),
+          });
+          getIO().to(extensionId).emit("streaming_update", {
             text: updateMessages[messageIndex],
             type: "update",
           });
@@ -870,7 +878,11 @@ var scanCoinAction = {
         if (analysis && callback) {
           // Final progress update
           if (extensionId) {
-            io.to(extensionId).emit("streaming_update", {
+            console.log("DEBUG - Emitting final analysis completion:", {
+              extensionId,
+              socketInstance: !!getIO(),
+            });
+            getIO().to(extensionId).emit("streaming_update", {
               text: "✅ Analysis complete! Preparing final report...",
               type: "update",
             });
@@ -930,7 +942,7 @@ var scanCoinAction = {
     } catch (error) {
       console.error("Coin scan failed:", error);
       if (message.extensionId) {
-        io.to(message.extensionId).emit("streaming_update", {
+        getIO().to(message.extensionId).emit("streaming_update", {
           text: "Sorry, I encountered an error while processing your request.",
           type: "update",
         });

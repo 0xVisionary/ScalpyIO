@@ -154,35 +154,36 @@ function App() {
     chrome.tabs.onActivated.addListener(tabChangeListener);
     chrome.tabs.onUpdated.addListener(tabUpdateListener);
 
+    // Cleanup function
     return () => {
-      console.log('Cleaning up event listeners...');
+      console.log('Cleaning up event listeners and socket...');
       chrome.runtime.onMessage.removeListener(messageListener);
       chrome.tabs.onActivated.removeListener(tabChangeListener);
       chrome.tabs.onUpdated.removeListener(tabUpdateListener);
       port.disconnect();
-      // Cleanup socket on unmount
       if (socket) {
+        console.log('Disconnecting socket...');
         socket.disconnect();
       }
     };
   }, []); // Empty dependency array means this runs once on mount
 
   return (
-    <div className="flex flex-col min-h-0 bg-[#1a1f2e] text-gray-200 h-full w-full p-0">
-      <header className="flex flex-col border-b border-[#2d3548]">
+    <div className="flex flex-col min-h-0 bg-transparent text-[#0F172A] h-full w-full p-0">
+      <header className="flex flex-col border-b border-gray-200 px-2">
         <div className="flex items-center py-2">
-          <h1 className="text-lg font-semibold">Trading Assistant</h1>
+          <h1 className="text-lg font-semibold text-[#0F172A]">Trading Assistant</h1>
         </div>
         <div className="flex items-center gap-2 pb-2">
           <input
             type="text"
             value={tokenAddress || "No address detected"}
             readOnly
-            className="w-full bg-[#242b3d] border border-[#2d3548] rounded-lg px-3 py-2 text-sm text-gray-200 shadow-[0_2px_8px_rgba(0,0,0,0.2)]"
+            className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-[#0F172A] shadow-[0_2px_8px_rgba(0,0,0,0.1)]"
           />
           <button 
             onClick={handleCopy}
-            className="p-2 bg-[#242b3d] border border-[#2d3548] rounded-lg text-gray-400 hover:text-white shadow-[0_2px_8px_rgba(0,0,0,0.2)] transition-colors"
+            className="p-2 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-[#0F172A] shadow-[0_2px_8px_rgba(0,0,0,0.1)] transition-colors"
             disabled={!tokenAddress}
           >
             {showCopySuccess ? (
@@ -198,7 +199,7 @@ function App() {
         </div>
       </header>
       
-      <div className="flex-1 overflow-y-auto overflow-x-hidden flex-grow">
+      <div className="flex-1 overflow-y-auto flex-grow">
         <ChatSection 
           messages={messages} 
           setMessages={setMessages} 

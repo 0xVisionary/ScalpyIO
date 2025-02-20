@@ -2,8 +2,8 @@ import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { createAgentRuntime, cleanupRuntime, processMessage } from "./agent.js";
-import { Server } from "socket.io";
 import http from "http";
+import { initializeSocketIO } from "./socket.js";
 
 const app = express();
 
@@ -30,7 +30,7 @@ app.use(limiter);
 // Create more strict rate limit for agent creation
 const createAgentLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5, // Limit each IP to 5 agent creations per hour
+  max: 100, // Limit each IP to 5 agent creations per hour
   message:
     "Too many agent creation attempts from this IP, please try again later.",
   standardHeaders: true,
@@ -74,25 +74,8 @@ app.use(express.json());
 // Create HTTP server
 const server = http.createServer(app);
 
-// Initialize Socket.IO with CORS config
-console.log("Initializing Socket.IO server");
-export const io = new Server(server, {
-  cors: {
-    origin: function (origin, callback) {
-      if (!origin) {
-        return callback(null, true);
-      }
-      const isAllowed = allowedOrigins.some((allowed) =>
-        typeof allowed === "string" ? allowed === origin : allowed.test(origin)
-      );
-      callback(null, isAllowed);
-    },
-    methods: ["GET", "POST"],
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  },
-  transports: ["websocket", "polling"],
-});
+// Initialize Socket.IO
+export const io = initializeSocketIO(server);
 
 io.on("connection", (socket) => {
   try {

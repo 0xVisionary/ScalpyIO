@@ -228,6 +228,7 @@ export async function processMessage(agentId, messageData) {
 }
 
 async function createAgentRuntime(userId) {
+  console.log("DEBUG - Creating agent runtime for userId/extensionId:", userId);
   const port = nextPort++;
 
   try {
@@ -243,6 +244,7 @@ async function createAgentRuntime(userId) {
 
     await runtime.initialize();
     runtime.userId = userId;
+    console.log("DEBUG - Initialized runtime with userId:", runtime.userId);
 
     // Ensure user exists in database with extensionId as primary identifier
     try {
@@ -334,41 +336,6 @@ async function cleanupRuntime(userId) {
     }
   }
 }
-
-// Example of creating agents for multiple users
-async function startAgentsForUsers(userIds) {
-  try {
-    // Start an agent for each user
-    const runtimes = await Promise.all(
-      userIds.map((userId) => createAgentRuntime(userId))
-    );
-
-    console.log("All agents started successfully");
-
-    // Handle graceful shutdown
-    process.on("SIGINT", async () => {
-      console.log("Shutting down all agents...");
-      await Promise.all(
-        Array.from(runtimeCache.keys()).map((userId) => cleanupRuntime(userId))
-      );
-      process.exit(0);
-    });
-
-    return runtimes;
-  } catch (error) {
-    console.error("Failed to start agents:", error);
-    // Cleanup any successful starts
-    await Promise.all(
-      Array.from(runtimeCache.keys()).map((userId) => cleanupRuntime(userId))
-    );
-    process.exit(1);
-  }
-}
-
-// Example usage:
-const userIds = ["user1", "user2", "user3"];
-console.log("Starting agents for users...");
-startAgentsForUsers(userIds).catch(console.error);
 
 // Export functions for use in other files
 export { createAgentRuntime, cleanupRuntime, runtimeCache, sqliteDb };

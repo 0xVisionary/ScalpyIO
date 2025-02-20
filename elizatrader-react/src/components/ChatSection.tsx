@@ -92,28 +92,28 @@ const ChatSection = ({ messages, setMessages, isScanning = false }: ChatSectionP
   return (
     <div className="flex flex-col h-full">
       {/* Messages container */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2">
         <div className="flex flex-col">
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`py-2 ${message.type === 'bot' ? 'bg-[#1a1f2e] -mx-4 px-4' : ''}`}
+              className={`py-2 ${message.type === 'bot' ? 'bg-transparent' : ''}`}
             >
               <div className="flex items-start">
                 {message.type === 'update' ? (
                   // Update message - simple text with loading indicator
-                  <div className="w-full text-sm text-blue-400 px-4 py-1 bg-[#242b3d] rounded-md">
+                  <div className="w-full text-left text-sm text-[#8131CF] px-4 py-1 rounded-md">
                     {message.text}
                   </div>
                 ) : (
                   // Regular chat messages (user or bot)
                   <>
                     {message.type === 'bot' ? (
-                      <div className="w-7 h-7 shrink-0 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs mr-3">
+                      <div className="w-7 h-7 shrink-0 rounded-full bg-[#8131CF] flex items-center justify-center text-white text-xs mr-3 shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
                         AI
                       </div>
                     ) : (
-                      <div className="w-7 h-7 shrink-0 rounded-full bg-gray-600 flex items-center justify-center text-white text-xs mr-3">
+                      <div className="w-7 h-7 shrink-0 rounded-full bg-[#ffffff] flex items-center justify-center text-[#0F172A] text-xs mr-3 shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
                         U
                       </div>
                     )}
@@ -121,8 +121,8 @@ const ChatSection = ({ messages, setMessages, isScanning = false }: ChatSectionP
                       <div 
                         className={`text-sm break-words whitespace-pre-wrap text-left inline-block ${
                           message.type === 'user' 
-                            ? 'bg-blue-500 text-white rounded-2xl rounded-tl-sm py-2 px-3' 
-                            : 'bg-[#242b3d] text-gray-200 rounded-2xl rounded-tl-sm py-2 px-3 prose prose-invert prose-sm max-w-none prose-headings:mt-4 prose-headings:mb-2 prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-blue-400'
+                            ? 'bg-[#8131CF] text-white rounded-2xl rounded-tl-sm py-2 px-3 shadow-[0_2px_8px_rgba(0,0,0,0.2)]' 
+                            : 'bg-[#ffffff] text-[#0F172A] rounded-2xl rounded-tl-sm py-2 px-3 prose prose-invert prose-sm max-w-none prose-headings:mt-4 prose-headings:mb-2 prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-strong:text-[#8131CF] shadow-[0_2px_8px_rgba(0,0,0,0.2)]'
                         }`}
                         style={{ wordBreak: 'break-word' }}
                       >
@@ -147,16 +147,16 @@ const ChatSection = ({ messages, setMessages, isScanning = false }: ChatSectionP
             </div>
           ))}
           {(isLoading || isScanning) && (
-            <div className="py-2 bg-[#1a1f2e] -mx-4 px-4">
+            <div className="py-2 bg-transparent -mx-4 px-4">
               <div className="flex items-start">
-                <div className="w-7 h-7 shrink-0 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs mr-3">
+                <div className="w-7 h-7 shrink-0 rounded-full bg-[#8131CF] flex items-center justify-center text-white text-xs mr-3 shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
                   AI
                 </div>
-                <div className="bg-[#242b3d] rounded-2xl rounded-tl-sm py-2 px-3">
+                <div className="bg-white rounded-2xl rounded-tl-sm py-2 px-3 shadow-[0_2px_8px_rgba(0,0,0,0.2)]">
                   <div className="flex gap-1">
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce"></div>
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce delay-100"></div>
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce delay-200"></div>
+                    <div className="w-1.5 h-1.5 bg-[#8131CF] rounded-full animate-bounce"></div>
+                    <div className="w-1.5 h-1.5 bg-[#8131CF] rounded-full animate-bounce delay-100"></div>
+                    <div className="w-1.5 h-1.5 bg-[#8131CF] rounded-full animate-bounce delay-200"></div>
                   </div>
                 </div>
               </div>
@@ -167,7 +167,7 @@ const ChatSection = ({ messages, setMessages, isScanning = false }: ChatSectionP
       </div>
 
       {/* Chat Input Section */}
-      <div className="mt-auto border-t border-[#2d3548] p-2 px-0 space-y-2 bg-[#1a1f2e]">
+      <div className="mt-auto border-t border-gray-200 p-2 space-y-2 bg-transparent">
         <form onSubmit={handleSubmit}>
           <div className={`flex items-${isMultiline ? 'end' : 'center'} relative`}>
             <textarea
@@ -178,13 +178,13 @@ const ChatSection = ({ messages, setMessages, isScanning = false }: ChatSectionP
               onKeyDown={handleKeyDown}
               placeholder="Type your message..."
               disabled={isLoading || isScanning}
-              className="w-full bg-[#242b3d] border border-[#2d3548] rounded-lg px-3 py-2 pr-10 text-sm text-gray-200 outline-none focus:border-blue-500 transition-colors shadow-[0_2px_8px_rgba(0,0,0,0.2)] resize-none overflow-y-auto max-h-[200px] disabled:opacity-50"
+              className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 pr-10 text-sm text-[#0F172A] outline-none focus:border-[#8131CF] transition-colors shadow-[0_2px_8px_rgba(0,0,0,0.2)] resize-none overflow-y-auto max-h-[200px] disabled:opacity-50"
               style={{ minHeight: '38px' }}
             />
             <button
               type="submit"
               disabled={isLoading || isScanning || !input.trim()}
-              className="flex-none ml-2 h-[38px] w-[38px] bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors flex items-center justify-center"
+              className="flex-none ml-2 h-[38px] w-[38px] bg-[#8131CF] hover:bg-[#6f2ab3] disabled:opacity-50 disabled:cursor-not-allowed rounded-md transition-colors flex items-center justify-center"
             >
               <svg 
                 viewBox="0 0 24 24"
