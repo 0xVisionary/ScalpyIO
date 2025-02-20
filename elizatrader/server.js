@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
-import { createAgentRuntime, cleanupRuntime } from "./agent.js";
+import { createAgentRuntime, cleanupRuntime, processMessage } from "./agent.js";
 import { Server } from "socket.io";
 import http from "http";
 
@@ -170,6 +170,30 @@ app.post("/cleanup_agent", async (req, res) => {
   }
 });
 
+// Add message route
+app.post("/agent/:agentId/message", async (req, res) => {
+  try {
+    const { agentId } = req.params;
+    const { text, extensionId } = req.body;
+
+    if (!text || !extensionId) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    console.log("Processing message for agent:", agentId);
+    const response = await processMessage(agentId, {
+      text,
+      userId: extensionId,
+      roomId: extensionId,
+      userName: `user_${extensionId}`,
+    });
+
+    res.json(response);
+  } catch (error) {
+    console.error("Error processing message:", error);
+    res.status(500).json({ error: "Failed to process message" });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

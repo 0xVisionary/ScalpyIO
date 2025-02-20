@@ -14,6 +14,7 @@ import express from "express";
 import http from "http";
 import { elizaLogger } from "@elizaos/core";
 import { CustomSqliteAdapter } from "./CustomSqliteAdapter.js";
+import fetch from "node-fetch";
 
 dotenv.config();
 
@@ -178,6 +179,54 @@ const testAgent = {
 const runtimeCache = new Map();
 let nextPort = 3001;
 
+/**
+ * Process a message through an agent's runtime
+ */
+export async function processMessage(agentId, messageData) {
+  try {
+    // Find the runtime data for this agent
+    const runtimeData = Array.from(runtimeCache.values()).find(
+      (data) => data.agentId === agentId
+    );
+
+    if (!runtimeData) {
+      console.error(`No runtime found for agent ${agentId}`);
+      throw new Error("Agent not found");
+    }
+
+    // Forward the request to the internal agent server
+    const response = await fetch(
+      `http://localhost:${runtimeData.port}/${agentId}/message`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(messageData),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Agent server responded with ${response.status}`);
+    }
+
+    const data = await response.json();
+    const messageResponse = Array.isArray(data) ? data[0] : data;
+
+    return {
+      agentId,
+      message:
+        messageResponse.response?.content ||
+        messageResponse.text ||
+        "Sorry, I couldn't process that message.",
+      timestamp: new Date(),
+    };
+  } catch (error) {
+    console.error("Error in processMessage:", error);
+    throw error;
+  }
+}
+
 async function createAgentRuntime(userId) {
   const port = nextPort++;
 
@@ -193,8 +242,6 @@ async function createAgentRuntime(userId) {
     });
 
     await runtime.initialize();
-
-    // Set the userId (extensionId) in the runtime
     runtime.userId = userId;
 
     // Ensure user exists in database with extensionId as primary identifier
@@ -242,7 +289,7 @@ async function createAgentRuntime(userId) {
           userName,
         });
 
-        res.json({ response: response.content });
+        res.json({ response });
       } catch (error) {
         console.error("Error handling message:", error);
         res.status(500).json({ error: error.message });
@@ -263,7 +310,6 @@ async function createAgentRuntime(userId) {
     };
 
     runtimeCache.set(userId, runtimeData);
-
     console.log(
       `Agent initialized for user ${userId} on port ${port} with ID ${runtime.agentId}`
     );

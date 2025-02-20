@@ -2,7 +2,7 @@ import { TokenMetrics, Message } from '../types';
 import { io, Socket } from 'socket.io-client';
 
 const BIRDEYE_API_KEY = import.meta.env.VITE_BIRDEYE_API_KEY;
-const SERVER_URL = 'http://localhost:3000';
+const SERVER_URL = import.meta.env.VITE_SERVER_URL;
 
 let socket: Socket | null = null;
 let streamingCallback: ((data: any) => void) | null = null;
@@ -74,7 +74,7 @@ let agentId: string | null = null;
 export const initializeAgent = async () => {
   try {
     const extensionId = getExtensionId();
-    const response = await fetch("http://localhost:3000/create_agent", {
+    const response = await fetch(`${SERVER_URL}/create_agent`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -98,13 +98,13 @@ export const initializeAgent = async () => {
 };
 
 export const sendMessage = async (text: string): Promise<Message> => {
-  if (!agentPort || !agentId) {
+  if (!agentId) {
     throw new Error("Agent not initialized");
   }
 
   const extensionId = getExtensionId();
   const response = await fetch(
-    `http://localhost:${agentPort}/${agentId}/message`,
+    `${SERVER_URL}/agent/${agentId}/message`,
     {
       method: "POST",
       headers: {
@@ -113,64 +113,19 @@ export const sendMessage = async (text: string): Promise<Message> => {
       body: JSON.stringify({
         text,
         extensionId,
-        roomId: "test-room",
-        userName: "Test User",
-        content: { 
-          text,
-          extensionId
-        }
       }),
     }
   );
 
+  if (!response.ok) {
+    throw new Error(`Failed to send message: ${response.statusText}`);
+  }
+
   const data = await response.json();
   
-  // Handle case where no message is returned
-  if (!data || (Array.isArray(data) && data.length === 0)) {
-    return {
-      id: Date.now().toString(),
-      text: "I'm not sure how to respond to that. Could you please rephrase or ask something else?",
-      type: 'bot',
-      timestamp: new Date(),
-    };
-  }
-
-  const messageData = Array.isArray(data) ? data[0] : data;
-
-  // Check if we have a response object with content
-  if (messageData.response && typeof messageData.response === 'string') {
-    return {
-      id: Date.now().toString(),
-      text: messageData.response,
-      type: 'bot',
-      timestamp: new Date(),
-    };
-  }
-
-  // If we have direct text in the response
-  if (messageData.text) {
-    return {
-      id: Date.now().toString(),
-      text: messageData.text,
-      type: 'bot',
-      timestamp: new Date(),
-    };
-  }
-
-  // If we have content in the response
-  if (messageData.content) {
-    return {
-      id: Date.now().toString(),
-      text: typeof messageData.content === 'string' ? messageData.content : messageData.content.text,
-      type: 'bot',
-      timestamp: new Date(),
-    };
-  }
-
-  // Fallback message if no valid response format is found
   return {
     id: Date.now().toString(),
-    text: "I'm not sure how to respond to that. Could you please rephrase or ask something else?",
+    text: data.message || "I'm not sure how to respond to that. Could you please rephrase?",
     type: 'bot',
     timestamp: new Date(),
   };
