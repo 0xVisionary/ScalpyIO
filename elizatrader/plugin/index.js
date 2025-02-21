@@ -571,28 +571,12 @@ import {
 var scanCoinAction = {
   name: "SCAN_COIN",
   similes: [
-    // Token symbol patterns - no $ required
-    "SCAN_[A-Z]+",
-    "ANALYZE_[A-Z]+",
-    "CHECK_[A-Z]+",
-    "IS_[A-Z]+_SAFE",
-    "SHOW_[A-Z]+_ANALYSIS",
-    "GET_[A-Z]+_METRICS",
-    "\\b[A-Z]{2,}\\b", // Direct token symbol (2 or more characters)
-
     // Direct address patterns - must be exact Solana address format
-    "SCAN_[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}",
-    "ANALYZE_[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}",
-    "CHECK_[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}",
     "^[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}$", // Exact address match only
-
-    // Combined address patterns
-    "CHECK_ADDRESS_[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}",
-    "ANALYZE_ADDRESS_[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}",
-    "SCAN_ADDRESS_[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}",
+    "^Scan:\\s*[A-Za-z1-9][A-HJ-NP-Za-km-z]{31,43}$", // Scan: prefix with address
   ],
   description:
-    "Analyzes and provides information about Solana coins/tokens including trust scores, safety metrics, and market analysis. This action triggers when users ask about specific tokens using $ symbol (like $JUP, $WIF) or when they provide a Solana token address. It handles natural queries like 'What can you tell me about $TOKEN?', 'Is this coin safe?', or 'Can you check this address?'",
+    "Analyzes and provides information about Solana coins/tokens including trust scores, safety metrics, and market analysis.",
   validate: async (runtime, message) => {
     const text = message.content.text.trim();
     elizaLogger.debug("Validating scan coin action for text:", text);
@@ -600,42 +584,23 @@ var scanCoinAction = {
     // First check if this is an auto-scan request (starts with Scan:)
     if (/^Scan:/i.test(text)) {
       const cleanText = text.replace(/^Scan:\s*/i, "").trim();
-      const hasValidIdentifier =
-        /\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/.test(cleanText) ||
-        /(?:\$)?[A-Z]{2,}\b/.test(cleanText);
+      const hasValidIdentifier = /\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/.test(
+        cleanText
+      );
       elizaLogger.debug(
         `Auto-scan request validation result: ${hasValidIdentifier}`
       );
       return hasValidIdentifier;
     }
 
-    // Check for common follow-up question patterns
-    const followUpPatterns = [
-      /^how'?s it looking$/i,
-      /^how does it look$/i,
-      /^what do you think$/i,
-      /^is it safe$/i,
-      /^should i (buy|invest|go for) it$/i,
-      /^what'?s your opinion$/i,
-      /^tell me more$/i,
-      /^what about this one$/i,
-      /^can you analyze this$/i,
-    ];
-
-    if (followUpPatterns.some((pattern) => pattern.test(text))) {
-      elizaLogger.debug("Detected follow-up question, skipping scan");
-      return false;
-    }
-
     // Then check for a direct token identifier
-    const hasDirectIdentifier =
-      /(?:\$)?[A-Z]{2,}\b|\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/.test(text);
+    const hasDirectIdentifier = /\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/.test(text);
     if (hasDirectIdentifier) {
       elizaLogger.debug("Direct token identifier found");
       return true;
     }
 
-    // If no direct token identifier, let ElizaOS handle it with memory
+    // Let ElizaOS handle all other messages
     elizaLogger.debug(
       "No direct token identifier found, letting ElizaOS handle with memory"
     );

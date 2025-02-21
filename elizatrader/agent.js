@@ -153,6 +153,10 @@ const testAgent = {
       contextWindow: 10, // Remember last 10 messages for context
       useLastToken: true, // Enable using last token context
     },
+    actions: {
+      inferFromText: false, // Disable automatic action inference
+      useExactMatch: true, // Only use exact action matches
+    },
   },
   topics: ["cryptocurrency", "trading", "token analysis", "market metrics"],
   adjectives: ["analytical", "informative", "precise"],
