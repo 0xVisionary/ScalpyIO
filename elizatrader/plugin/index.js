@@ -871,7 +871,7 @@ var scanCoinAction = {
               throw new Error("Missing required fields in analysis data");
             }
 
-            // Send the structured data
+            // Try to send the structured data
             await callback({
               text: JSON.stringify(analysisData, null, 2),
               type: "bot",
@@ -880,22 +880,34 @@ var scanCoinAction = {
             elizaLogger.error("Failed to parse analysis JSON:", parseError);
             elizaLogger.error("Raw analysis:", analysis);
 
-            // Try to send the raw analysis as a fallback
-            if (
-              typeof analysis === "string" &&
-              analysis.trim().startsWith("{") &&
-              analysis.trim().endsWith("}")
-            ) {
-              await callback({
-                text: analysis,
-                type: "bot",
-              });
-            } else {
-              await callback({
-                text: "Sorry, I encountered an error while formatting the analysis. Please try again.",
-                type: "bot",
-              });
+            // Try to extract JSON from markdown code blocks if present
+            if (typeof analysis === "string") {
+              try {
+                const jsonMatch = analysis.match(
+                  /```json\s*(\{[\s\S]*\})\s*```/
+                );
+                if (jsonMatch && jsonMatch[1]) {
+                  const cleanJson = jsonMatch[1].trim();
+                  const parsedJson = JSON.parse(cleanJson);
+                  await callback({
+                    text: JSON.stringify(parsedJson, null, 2),
+                    type: "bot",
+                  });
+                  return;
+                }
+              } catch (extractError) {
+                elizaLogger.error(
+                  "Failed to extract JSON from markdown:",
+                  extractError
+                );
+              }
             }
+
+            // Final fallback - send error message
+            await callback({
+              text: "Sorry, I encountered an error while formatting the analysis. Please try again.",
+              type: "bot",
+            });
           }
         }
       } catch (error) {
