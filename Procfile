@@ -1,1 +1,0 @@
-web: cd elizatrader && node server.js 
