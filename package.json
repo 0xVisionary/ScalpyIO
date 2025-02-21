@@ -5,6 +5,6 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "cd elizatrader && node server.js"
+    "start": "cd elizatrader && npm install && node server.js"
   }
 }
