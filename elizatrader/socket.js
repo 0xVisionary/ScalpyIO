@@ -40,16 +40,21 @@ export const initializeSocketIO = (server) => {
         }
       },
       credentials: true,
-      methods: ["GET", "POST"],
+      methods: ["GET", "POST", "OPTIONS"],
       allowedHeaders: [
         "Content-Type",
         "Authorization",
         "X-Requested-With",
         "Accept",
         "Origin",
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Credentials",
       ],
     },
+    allowEIO3: true,
     transports: ["websocket", "polling"],
+    pingTimeout: 60000,
+    pingInterval: 25000,
   });
 
   io.on("connection", (socket) => {

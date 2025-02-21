@@ -11,6 +11,7 @@ const app = express();
 const allowedOrigins = [
   /^http:\/\/localhost:/, // Any localhost port
   /^chrome-extension:\/\/.*/, // Any Chrome extension
+  "https://scalpy-io-44e3093700f8.herokuapp.com", // Heroku server
 ];
 
 // Configure rate limiting
@@ -39,8 +40,13 @@ const createAgentLimiter = rateLimit({
 app.use(
   cors({
     origin: function (origin, callback) {
+      console.log("Request from origin:", origin);
+
       // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
+      if (!origin) {
+        console.log("No origin, allowing");
+        return callback(null, true);
+      }
 
       // Check if origin matches any allowed pattern
       const isAllowed = allowedOrigins.some((allowed) =>
@@ -48,9 +54,10 @@ app.use(
       );
 
       if (isAllowed) {
+        console.log("Origin allowed:", origin);
         callback(null, true);
       } else {
-        console.log("Rejected origin:", origin);
+        console.log("Origin rejected:", origin);
         callback(new Error("Not allowed by CORS"));
       }
     },
@@ -62,12 +69,35 @@ app.use(
       "X-Requested-With",
       "Accept",
       "Origin",
+      "Access-Control-Allow-Origin",
+      "Access-Control-Allow-Credentials",
     ],
+    exposedHeaders: ["Access-Control-Allow-Origin"],
   })
 );
 
-// Handle preflight requests
-app.options("*", cors());
+// Handle preflight requests for all routes
+app.options("*", (req, res) => {
+  const origin = req.headers.origin;
+
+  // Check if origin is allowed
+  const isAllowed = allowedOrigins.some((allowed) =>
+    typeof allowed === "string" ? allowed === origin : allowed.test(origin)
+  );
+
+  if (isAllowed) {
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Requested-With, Accept, Origin"
+    );
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.status(200).send();
+  } else {
+    res.status(403).send("CORS not allowed");
+  }
+});
 
 app.use(express.json());
 
