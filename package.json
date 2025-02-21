@@ -5,6 +5,7 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "start": "cd elizatrader && npm ci --only=production && node server.js"
+    "start": "cd elizatrader && npm ci --only=production && node server.js",
+    "heroku-postbuild": "cd elizatrader && npm ci"
   }
 }
