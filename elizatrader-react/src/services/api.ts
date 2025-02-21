@@ -31,7 +31,14 @@ export const initializeSocket = (onStreamingUpdate?: (data: any) => void) => {
     },
     transports: ['websocket', 'polling'],
     reconnection: true,
-    reconnectionAttempts: 5
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000,
+    withCredentials: true,
+    extraHeaders: {
+      "Origin": chrome.runtime.getURL("")
+    }
   });
 
   socket.on('connect', () => {
@@ -42,12 +49,17 @@ export const initializeSocket = (onStreamingUpdate?: (data: any) => void) => {
   socket.on('connect_error', (error) => {
     console.error('DEBUG - Socket connection error:', error);
     console.log('DEBUG - Socket connection error details:', {
-      message: error.message
+      message: error.message,
+      name: error.name
     });
   });
 
   socket.on('disconnect', (reason) => {
     console.log('DEBUG - Socket disconnected. Reason:', reason);
+    if (reason === 'io server disconnect') {
+      // Server initiated disconnect, try to reconnect
+      socket?.connect();
+    }
   });
 
   socket.on('error', (error) => {
@@ -103,32 +115,40 @@ export const sendMessage = async (text: string): Promise<Message> => {
   }
 
   const extensionId = getExtensionId();
-  const response = await fetch(
-    `${SERVER_URL}/agent/${agentId}/message`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        text,
-        extensionId,
-      }),
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to send message: ${response.statusText}`);
-  }
-
-  const data = await response.json();
+  console.log('DEBUG - Sending message:', { agentId, text, extensionId });
   
-  return {
-    id: Date.now().toString(),
-    text: data.message || "I'm not sure how to respond to that. Could you please rephrase?",
-    type: 'bot',
-    timestamp: new Date(),
-  };
+  try {
+    const response = await fetch(`${SERVER_URL}/agent/${agentId}/message`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': chrome.runtime.getURL(""),
+      },
+      credentials: 'include',
+      body: JSON.stringify({ text, extensionId })
+    });
+
+    if (!response.ok) {
+      console.error('DEBUG - API Error:', {
+        status: response.status,
+        statusText: response.statusText
+      });
+      throw new Error(`API Error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    console.log('DEBUG - API Response:', data);
+    
+    return {
+      id: Date.now().toString(),
+      text: data.message || "I'm not sure how to respond to that. Could you please rephrase?",
+      type: 'bot',
+      timestamp: new Date(),
+    };
+  } catch (error) {
+    console.error('DEBUG - Failed to send message:', error);
+    throw error;
+  }
 };
 
 export const searchToken = async (keyword: string) => {

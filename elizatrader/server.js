@@ -9,10 +9,8 @@ const app = express();
 
 // Define allowed origins
 const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:5173", // Vite dev server
-  "https://scalpy-server-41f6c3cfd811.herokuapp.com",
-  /^chrome-extension:\/\/.*/, // Allow any Chrome extension
+  /^http:\/\/localhost:/, // Any localhost port
+  /^chrome-extension:\/\/.*/, // Any Chrome extension
 ];
 
 // Configure rate limiting
@@ -20,8 +18,8 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
   message: "Too many requests from this IP, please try again later.",
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 // Apply rate limiting to all routes
@@ -37,16 +35,14 @@ const createAgentLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Configure CORS for Express
+// Configure CORS
 app.use(
   cors({
     origin: function (origin, callback) {
       // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) {
-        return callback(null, true);
-      }
+      if (!origin) return callback(null, true);
 
-      // Check if the origin is allowed
+      // Check if origin matches any allowed pattern
       const isAllowed = allowedOrigins.some((allowed) =>
         typeof allowed === "string" ? allowed === origin : allowed.test(origin)
       );
@@ -54,11 +50,12 @@ app.use(
       if (isAllowed) {
         callback(null, true);
       } else {
+        console.log("Rejected origin:", origin);
         callback(new Error("Not allowed by CORS"));
       }
     },
-    methods: ["GET", "POST", "OPTIONS"],
     credentials: true,
+    methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: [
       "Content-Type",
       "Authorization",
@@ -68,6 +65,9 @@ app.use(
     ],
   })
 );
+
+// Handle preflight requests
+app.options("*", cors());
 
 app.use(express.json());
 
@@ -164,6 +164,17 @@ app.post("/agent/:agentId/message", async (req, res) => {
     }
 
     console.log("Processing message for agent:", agentId);
+    console.log("Request origin:", req.headers.origin);
+
+    // Set CORS headers explicitly for this route
+    res.header("Access-Control-Allow-Origin", req.headers.origin);
+    res.header("Access-Control-Allow-Credentials", "true");
+    res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Requested-With, Accept, Origin"
+    );
+
     const response = await processMessage(agentId, {
       text,
       userId: extensionId,

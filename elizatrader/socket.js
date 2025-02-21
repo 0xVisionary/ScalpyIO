@@ -1,11 +1,10 @@
 import { Server } from "socket.io";
 
-// Define allowed origins
+// Define allowed origins (must match server.js)
 const allowedOrigins = [
-  "http://localhost:3000",
-  "http://localhost:5173", // Vite dev server
-  "https://scalpy-server-41f6c3cfd811.herokuapp.com",
-  /^chrome-extension:\/\/.*/, // Allow any Chrome extension
+  /^http:\/\/localhost:/, // Any localhost port
+  /^chrome-extension:\/\/.*/, // Any Chrome extension
+  "https://scalpy-io-44e3093700f8.herokuapp.com", // Heroku server
 ];
 
 let io = null;
@@ -17,19 +16,38 @@ export const initializeSocketIO = (server) => {
   io = new Server(server, {
     cors: {
       origin: function (origin, callback) {
+        console.log("Socket.IO - Request from origin:", origin);
+
+        // Allow requests with no origin
         if (!origin) {
+          console.log("Socket.IO - No origin, allowing");
           return callback(null, true);
         }
+
+        // Check if origin matches any allowed pattern
         const isAllowed = allowedOrigins.some((allowed) =>
           typeof allowed === "string"
             ? allowed === origin
             : allowed.test(origin)
         );
-        callback(null, isAllowed);
+
+        if (isAllowed) {
+          console.log("Socket.IO - Origin allowed:", origin);
+          callback(null, true);
+        } else {
+          console.log("Socket.IO - Origin rejected:", origin);
+          callback(new Error("Not allowed by CORS"));
+        }
       },
-      methods: ["GET", "POST"],
       credentials: true,
-      allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+      methods: ["GET", "POST"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+      ],
     },
     transports: ["websocket", "polling"],
   });
@@ -40,6 +58,7 @@ export const initializeSocketIO = (server) => {
       console.log("DEBUG - Socket connection attempt");
       console.log("DEBUG - Socket ID:", socket.id);
       console.log("DEBUG - Query params:", socket.handshake.query);
+      console.log("DEBUG - Origin:", socket.handshake.headers.origin);
 
       if (!extensionId) {
         console.error("DEBUG - No extension ID provided in connection");
