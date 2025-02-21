@@ -37,48 +37,41 @@ const createAgentLimiter = rateLimit({
 });
 
 // Configure CORS
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      console.log("Request from origin:", origin);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  console.log("Request from origin:", origin);
 
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) {
-        console.log("No origin, allowing");
-        return callback(null, true);
-      }
+  // Allow requests with no origin (like mobile apps or curl requests)
+  if (!origin) {
+    console.log("No origin, allowing");
+    return next();
+  }
 
-      // Check if origin matches any allowed pattern
-      const isAllowed = allowedOrigins.some((allowed) =>
-        typeof allowed === "string" ? allowed === origin : allowed.test(origin)
-      );
+  // Check if origin matches any allowed pattern
+  const isAllowed = allowedOrigins.some((allowed) =>
+    typeof allowed === "string" ? allowed === origin : allowed.test(origin)
+  );
 
-      if (isAllowed) {
-        console.log("Origin allowed:", origin);
-        callback(null, true);
-      } else {
-        console.log("Origin rejected:", origin);
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "X-Requested-With",
-      "Accept",
-      "Origin",
-      "Access-Control-Allow-Origin",
-      "Access-Control-Allow-Credentials",
-    ],
-    exposedHeaders: ["Access-Control-Allow-Origin"],
-  })
-);
+  if (isAllowed) {
+    console.log("Origin allowed:", origin);
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Requested-With, Accept, Origin"
+    );
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    next();
+  } else {
+    console.log("Origin rejected:", origin);
+    res.status(403).send("CORS not allowed");
+  }
+});
 
 // Handle preflight requests for all routes
 app.options("*", (req, res) => {
   const origin = req.headers.origin;
+  console.log("Handling preflight request from:", origin);
 
   // Check if origin is allowed
   const isAllowed = allowedOrigins.some((allowed) =>
