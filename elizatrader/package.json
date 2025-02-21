@@ -20,7 +20,7 @@
     "@tavily/core": "^0.0.2",
     "agent-twitter-client": "^0.0.18",
     "amqplib": "^0.10.5",
-    "better-sqlite3": "^9.4.1",
+    "better-sqlite3": "^8.0.1",
     "bn.js": "^5.2.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -39,6 +39,6 @@
     ]
   },
   "engines": {
-    "node": "23.8.0"
+    "node": "18.x"
   }
 }
