@@ -35,10 +35,7 @@ export const initializeSocket = (onStreamingUpdate?: (data: any) => void) => {
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
     timeout: 20000,
-    withCredentials: true,
-    extraHeaders: {
-      "Origin": chrome.runtime.getURL("")
-    }
+    withCredentials: true
   });
 
   socket.on('connect', () => {
@@ -57,7 +54,6 @@ export const initializeSocket = (onStreamingUpdate?: (data: any) => void) => {
   socket.on('disconnect', (reason) => {
     console.log('DEBUG - Socket disconnected. Reason:', reason);
     if (reason === 'io server disconnect') {
-      // Server initiated disconnect, try to reconnect
       socket?.connect();
     }
   });
@@ -66,7 +62,6 @@ export const initializeSocket = (onStreamingUpdate?: (data: any) => void) => {
     console.error('DEBUG - Socket error:', error);
   });
 
-  // Listen for streaming updates
   socket.on('streaming_update', (data) => {
     console.log('DEBUG - Received streaming update:', data);
     if (streamingCallback) {
@@ -89,11 +84,13 @@ export const initializeAgent = async () => {
     const response = await fetch(`${SERVER_URL}/create_agent`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         extensionId
       }),
+      credentials: 'include',
+      mode: 'cors'
     });
     const data = await response.json();
     if (data.success) {
@@ -121,10 +118,10 @@ export const sendMessage = async (text: string): Promise<Message> => {
     const response = await fetch(`${SERVER_URL}/agent/${agentId}/message`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Origin': chrome.runtime.getURL(""),
+        'Content-Type': 'application/json'
       },
       credentials: 'include',
+      mode: 'cors',
       body: JSON.stringify({ text, extensionId })
     });
 
