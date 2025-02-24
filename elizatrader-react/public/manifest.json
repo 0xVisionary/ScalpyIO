@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Trading Assistant",
+  "name": "Scalpy - AI Trading Scanner",
   "version": "1.0.0",
-  "description": "AI-powered trading assistant for cryptocurrency analysis",
+  "description": "AI-powered trading assistant for cryptocurrency analysis. Scan tokens for trust score, liquidity, holders, and more.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -11,9 +11,11 @@
     "sidePanel"
   ],
   "host_permissions": [
+    "https://scalpy-io-44e3093700f8.herokuapp.com/*",
     "*://*.photon-sol.tinyastro.io/*"
   ],
   "action": {
+    "default_title": "Open Scalpy Scanner",
     "default_icon": {
       "16": "assets/icon16.png",
       "32": "assets/icon32.png",
@@ -41,5 +43,7 @@
       ],
       "js": ["contentScript.js"]
     }
-  ]
+  ],
+  "author": "Scalpy",
+  "homepage_url": "https://scalpy.io"
 } 
