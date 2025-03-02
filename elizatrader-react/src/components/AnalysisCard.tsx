@@ -155,6 +155,7 @@ const Shimmer: React.FC<{ className?: string }> = ({ className = "" }) => (
 
 const AnalysisCard: React.FC<{ data: AnalysisData }> = ({ data }) => {
   const isLoading = data.isLoading || {};
+  console.log(data);
 
   return (
     <div className="bg-[radial-gradient(#f8f9fa_25%,#ffffff_75%)] rounded-lg border border-gray-200 overflow-hidden">
