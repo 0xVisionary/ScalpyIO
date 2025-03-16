@@ -50,7 +50,7 @@ export default function App() {
 
             <Button
               className="rounded-full shadow-lg text-sm md:text-base flex items-center gap-2"
-              onClick={() => {}}
+              onClick={() => window.open('https://chromewebstore.google.com/detail/scalpy-ai-trading-scanner/fodlmeapdiapecmkmpdncebdbfmcpbkk?utm_source=item-share-cb', '_blank')}
             >
               <FaChrome className="w-4 h-4 md:w-5 md:h-5" />
               Chrome Extension
